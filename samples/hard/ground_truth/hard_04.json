@@ -1,0 +1,105 @@
+{
+  "file": "hard_04.pdf",
+  "layout": "multipage",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Meridian Office Supply Co.",
+    "vendor_tax_id": "83-2290145",
+    "invoice_number": "MO-2026-2155",
+    "issue_date": "2026-02-18",
+    "due_date": "2026-03-20",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Ergonomic task chair, charcoal",
+        "quantity": 12.0,
+        "unit_price": 289.0,
+        "amount": 3468.0
+      },
+      {
+        "description": "Height-adjustable desk, 160x80cm",
+        "quantity": 12.0,
+        "unit_price": 612.0,
+        "amount": 7344.0
+      },
+      {
+        "description": "Monitor arm, dual mount",
+        "quantity": 24.0,
+        "unit_price": 98.5,
+        "amount": 2364.0
+      },
+      {
+        "description": "Acoustic desk divider, felt",
+        "quantity": 18.0,
+        "unit_price": 124.0,
+        "amount": 2232.0
+      },
+      {
+        "description": "Mobile pedestal drawer unit",
+        "quantity": 12.0,
+        "unit_price": 215.0,
+        "amount": 2580.0
+      },
+      {
+        "description": "Cable management tray",
+        "quantity": 24.0,
+        "unit_price": 38.0,
+        "amount": 912.0
+      },
+      {
+        "description": "Desk lamp, LED, dimmable",
+        "quantity": 24.0,
+        "unit_price": 54.0,
+        "amount": 1296.0
+      },
+      {
+        "description": "Whiteboard, magnetic, 120x90cm",
+        "quantity": 4.0,
+        "unit_price": 168.0,
+        "amount": 672.0
+      },
+      {
+        "description": "Archive boxes, pack of 25",
+        "quantity": 10.0,
+        "unit_price": 41.0,
+        "amount": 410.0
+      },
+      {
+        "description": "Floor protection mat",
+        "quantity": 12.0,
+        "unit_price": 72.5,
+        "amount": 870.0
+      },
+      {
+        "description": "Footrest, adjustable",
+        "quantity": 12.0,
+        "unit_price": 46.0,
+        "amount": 552.0
+      },
+      {
+        "description": "Power strip, 6-outlet, surge",
+        "quantity": 24.0,
+        "unit_price": 29.5,
+        "amount": 708.0
+      },
+      {
+        "description": "Delivery and installation",
+        "quantity": 1.0,
+        "unit_price": 1450.0,
+        "amount": 1450.0
+      },
+      {
+        "description": "Old furniture removal",
+        "quantity": 1.0,
+        "unit_price": 380.0,
+        "amount": 380.0
+      }
+    ],
+    "subtotal": 25238.0,
+    "tax_rate": 7.0,
+    "tax_amount": 1766.66,
+    "total": 27004.66
+  }
+}

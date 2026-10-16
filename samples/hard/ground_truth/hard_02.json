@@ -1,0 +1,44 @@
+{
+  "file": "hard_02.pdf",
+  "layout": "scanned",
+  "defect": "total_mismatch",
+  "expected_status": "needs_review",
+  "expected_issues": [
+    {
+      "code": "TOTAL_MISMATCH",
+      "field": "total"
+    }
+  ],
+  "invoice": {
+    "vendor_name": "Helvetia Cloud Systems AG",
+    "vendor_tax_id": "CHE-412.883.019 MWST",
+    "invoice_number": "HC-2026-2088",
+    "issue_date": "2026-04-12",
+    "due_date": "2026-05-12",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Managed Kubernetes cluster, monthly",
+        "quantity": 3.0,
+        "unit_price": 1180.0,
+        "amount": 3540.0
+      },
+      {
+        "description": "Object storage, per TB per month",
+        "quantity": 12.0,
+        "unit_price": 31.5,
+        "amount": 378.0
+      },
+      {
+        "description": "Platform support, business tier",
+        "quantity": 2.0,
+        "unit_price": 540.0,
+        "amount": 1080.0
+      }
+    ],
+    "subtotal": 4998.0,
+    "tax_rate": 21.0,
+    "tax_amount": 1049.58,
+    "total": 6122.58
+  }
+}

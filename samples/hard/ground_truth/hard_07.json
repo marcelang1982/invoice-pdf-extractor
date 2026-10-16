@@ -1,0 +1,45 @@
+{
+  "file": "hard_07.pdf",
+  "layout": "wrapped",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Meridian Office Supply Co.",
+    "vendor_tax_id": "83-2290145",
+    "invoice_number": "MO-2026-2232",
+    "issue_date": "2026-04-15",
+    "due_date": "2026-05-15",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Height-adjustable sit-stand desk with electric dual motor column, 180x80cm walnut veneer top, assembled on site",
+        "quantity": 8.0,
+        "unit_price": 845.0,
+        "amount": 6760.0
+      },
+      {
+        "description": "Ergonomic mesh task chair with adjustable lumbar support, 4D armrests and synchro-tilt mechanism",
+        "quantity": 8.0,
+        "unit_price": 412.5,
+        "amount": 3300.0
+      },
+      {
+        "description": "Acoustic ceiling baffle in recycled PET felt, 1200x600mm, suspended mounting kit included",
+        "quantity": 16.0,
+        "unit_price": 168.0,
+        "amount": 2688.0
+      },
+      {
+        "description": "Project management and floor-plan coordination with the building facilities team",
+        "quantity": 1.0,
+        "unit_price": 1250.0,
+        "amount": 1250.0
+      }
+    ],
+    "subtotal": 13998.0,
+    "tax_rate": 7.0,
+    "tax_amount": 979.86,
+    "total": 14977.86
+  }
+}

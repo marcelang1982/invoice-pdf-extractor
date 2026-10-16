@@ -1,6 +1,6 @@
-"""Score a `results.json` run against the ground truth corpus.
+"""Score an extraction run against a ground truth corpus.
 
-Reports two things, deliberately kept separate:
+Reports three things, deliberately kept separate:
 
   * **Field accuracy** - how often the extractor transcribed each field
     correctly, broken out per field rather than collapsed into one number. A
@@ -9,8 +9,15 @@ Reports two things, deliberately kept separate:
     unexpected findings. Recall alone is a bad metric: a validator that flags
     everything scores 100%. The unexpected-findings count is what keeps it
     honest.
+  * **Token cost** - per invoice and per set, so accuracy can be weighed
+    against what it costs to get.
 
-    python scripts/evaluate.py --results results.json [--show-errors]
+Two corpora are scored separately, never pooled: `clean` is born-digital and
+well typeset, `hard` is scanned, multipage, wrapped, messy and Argentine. A
+combined average would hide exactly the difference worth measuring.
+
+    python scripts/evaluate.py --set clean [--show-errors]
+    python scripts/evaluate.py --set hard  [--show-errors]
 """
 
 from __future__ import annotations
@@ -26,6 +33,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from invoice_extractor.models import BatchResult  # noqa: E402
+
+#: Known sample sets: name -> (default results file, ground truth directory).
+SETS: dict[str, tuple[str, str]] = {
+    "clean": ("results.json", "samples/ground_truth"),
+    "hard": ("results_hard.json", "samples/hard/ground_truth"),
+}
 
 #: Scalar invoice fields scored one-for-one.
 SCALAR_FIELDS: tuple[str, ...] = (
@@ -80,6 +93,20 @@ class Mismatch:
 
 
 @dataclass
+class TokenRow:
+    """What one invoice cost to extract."""
+
+    file: str
+    input_tokens: int
+    output_tokens: int
+    attempts: int
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
+@dataclass
 class Report:
     """Everything the evaluation measured."""
 
@@ -98,6 +125,8 @@ class Report:
 
     files_scored: int = 0
     files_failed: int = 0
+
+    tokens: list[TokenRow] = field(default_factory=list)
 
     @property
     def field_accuracy(self) -> float:
@@ -129,6 +158,14 @@ def evaluate(batch: BatchResult, truth_by_file: dict[str, dict]) -> Report:
 
         report.files_scored += 1
         _score_issues(result, truth, report)
+        report.tokens.append(
+            TokenRow(
+                file=result.file,
+                input_tokens=result.usage.input_tokens,
+                output_tokens=result.usage.output_tokens,
+                attempts=result.attempts,
+            )
+        )
 
         if result.invoice is None:
             report.files_failed += 1
@@ -234,8 +271,11 @@ def _normalize_text(value: Any) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def print_report(report: Report, *, show_errors: bool) -> None:
+def print_report(report: Report, *, show_errors: bool, set_name: str = "") -> None:
     """Print the evaluation summary."""
+    if set_name:
+        print("=" * 62)
+        print(f"SET: {set_name}")
     print("=" * 62)
     print("FIELD ACCURACY")
     print("=" * 62)
@@ -275,6 +315,8 @@ def print_report(report: Report, *, show_errors: bool) -> None:
         for file, code in report.unexpected:
             print(f"  {file}  {code}")
 
+    print_cost(report)
+
     print()
     print("=" * 62)
     print(
@@ -290,6 +332,43 @@ def print_report(report: Report, *, show_errors: bool) -> None:
             print(f"      actual:   {item.actual!r}")
     elif report.mismatches:
         print(f"{len(report.mismatches)} field mismatches (--show-errors for detail)")
+
+
+def print_cost(report: Report) -> None:
+    """Print token cost per invoice and for the set as a whole."""
+    if not report.tokens:
+        return
+
+    print()
+    print("=" * 62)
+    print("TOKEN COST")
+    print("=" * 62)
+    print(f"{'FILE':<20} {'INPUT':>9} {'OUTPUT':>8} {'TOTAL':>9} {'TRIES':>6}")
+    print("-" * 62)
+
+    for row in report.tokens:
+        print(
+            f"{row.file:<20} {row.input_tokens:>9,} {row.output_tokens:>8,} "
+            f"{row.total_tokens:>9,} {row.attempts:>6}"
+        )
+
+    count = len(report.tokens)
+    total_in = sum(r.input_tokens for r in report.tokens)
+    total_out = sum(r.output_tokens for r in report.tokens)
+    totals = [r.total_tokens for r in report.tokens]
+    retried = sum(1 for r in report.tokens if r.attempts > 1)
+
+    print("-" * 62)
+    print(
+        f"{'SET TOTAL':<20} {total_in:>9,} {total_out:>8,} "
+        f"{total_in + total_out:>9,}"
+    )
+    print(
+        f"{'MEAN PER INVOICE':<20} {total_in // count:>9,} {total_out // count:>8,} "
+        f"{(total_in + total_out) // count:>9,}"
+    )
+    print(f"{'MIN / MAX TOTAL':<20} {min(totals):>9,} {max(totals):>8,}")
+    print(f"{'EXTRACTIONS RETRIED':<20} {retried:>9}")
 
 
 def _print_score(label: str, score: FieldScore) -> None:
@@ -318,16 +397,23 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--set",
+        dest="set_name",
+        choices=sorted(SETS),
+        default="clean",
+        help="Which sample set to score (default: clean).",
+    )
+    parser.add_argument(
         "--results",
         type=Path,
-        default=root / "results.json",
-        help="Path to the results.json produced by the CLI.",
+        default=None,
+        help="Override the results file for the chosen set.",
     )
     parser.add_argument(
         "--ground-truth",
         type=Path,
-        default=root / "samples" / "ground_truth",
-        help="Directory of ground truth JSON files.",
+        default=None,
+        help="Override the ground truth directory for the chosen set.",
     )
     parser.add_argument(
         "--show-errors",
@@ -336,32 +422,37 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if not args.results.is_file():
+    default_results, default_truth = SETS[args.set_name]
+    results_path = args.results or root / default_results
+    truth_dir = args.ground_truth or root / default_truth
+    pdf_dir = truth_dir.parent / "pdfs"
+
+    if not results_path.is_file():
         print(
-            f"error: {args.results} not found. Run the extractor first:\n"
-            f"  python -m invoice_extractor extract samples/pdfs --out {args.results}",
+            f"error: {results_path} not found. Run the extractor first:\n"
+            f"  python -m invoice_extractor extract {pdf_dir} --out {results_path}",
             file=sys.stderr,
         )
         return 2
 
     try:
-        truths = load_ground_truth(args.ground_truth)
+        truths = load_ground_truth(truth_dir)
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    batch = BatchResult.model_validate_json(args.results.read_text(encoding="utf-8"))
+    batch = BatchResult.model_validate_json(results_path.read_text(encoding="utf-8"))
     report = evaluate(batch, truths)
 
     if report.files_scored == 0:
         print(
-            "error: no results matched the ground truth corpus. Did the run use "
-            "a different sample directory?",
+            f"error: no results in {results_path.name} matched the {args.set_name} "
+            "corpus. Did the run point at a different sample directory?",
             file=sys.stderr,
         )
         return 2
 
-    print_report(report, show_errors=args.show_errors)
+    print_report(report, show_errors=args.show_errors, set_name=args.set_name)
     return 0
 
 

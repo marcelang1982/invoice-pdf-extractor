@@ -1,0 +1,39 @@
+{
+  "file": "hard_06.pdf",
+  "layout": "wrapped",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Ravenna Analytics BV",
+    "vendor_tax_id": "NL004991237B01",
+    "invoice_number": "RA-2026-2210",
+    "issue_date": "2026-04-02",
+    "due_date": "2026-05-02",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Design and implementation of the clinical telemetry ingestion pipeline, including schema migration and backfill of historical device readings",
+        "quantity": 1.0,
+        "unit_price": 8400.0,
+        "amount": 8400.0
+      },
+      {
+        "description": "On-call support retainer covering incident response outside business hours, billed monthly in advance",
+        "quantity": 3.0,
+        "unit_price": 1150.0,
+        "amount": 3450.0
+      },
+      {
+        "description": "Data quality audit of the regulatory reporting extract, with written remediation plan",
+        "quantity": 1.0,
+        "unit_price": 2250.0,
+        "amount": 2250.0
+      }
+    ],
+    "subtotal": 14100.0,
+    "tax_rate": 21.0,
+    "tax_amount": 2961.0,
+    "total": 17061.0
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "file": "hard_10.pdf",
+  "layout": "factura_a",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Talleres Graficos Pampa S.R.L.",
+    "vendor_tax_id": "30-71234567-8",
+    "invoice_number": "0003-00014827",
+    "issue_date": "2026-03-11",
+    "due_date": "2026-04-10",
+    "currency": "ARS",
+    "line_items": [
+      {
+        "description": "Impresion offset folleteria A4, 4/4 color",
+        "quantity": 5000.0,
+        "unit_price": 48.75,
+        "amount": 243750.0
+      },
+      {
+        "description": "Disenio y armado de original",
+        "quantity": 1.0,
+        "unit_price": 86500.0,
+        "amount": 86500.0
+      },
+      {
+        "description": "Laminado mate sobre tapa",
+        "quantity": 2000.0,
+        "unit_price": 22.4,
+        "amount": 44800.0
+      },
+      {
+        "description": "Flete y distribucion AMBA",
+        "quantity": 1.0,
+        "unit_price": 54800.0,
+        "amount": 54800.0
+      }
+    ],
+    "subtotal": 429850.0,
+    "tax_rate": 21.0,
+    "tax_amount": 90268.5,
+    "total": 520118.5
+  }
+}

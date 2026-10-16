@@ -16,7 +16,7 @@ venv/
 .mypy_cache/
 
 # Run artifacts
-results.json
+results*.json
 *.log
 
 # OS

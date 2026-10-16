@@ -1,0 +1,39 @@
+{
+  "file": "hard_03.pdf",
+  "layout": "scanned",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Ravenna Analytics BV",
+    "vendor_tax_id": "NL004991237B01",
+    "invoice_number": "RA-2026-2103",
+    "issue_date": "2026-03-30",
+    "due_date": "2026-04-29",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Data pipeline engineering, hourly",
+        "quantity": 38.0,
+        "unit_price": 142.0,
+        "amount": 5396.0
+      },
+      {
+        "description": "Dashboard build, fixed scope",
+        "quantity": 1.0,
+        "unit_price": 2250.0,
+        "amount": 2250.0
+      },
+      {
+        "description": "Data quality audit",
+        "quantity": 1.0,
+        "unit_price": 1480.0,
+        "amount": 1480.0
+      }
+    ],
+    "subtotal": 9126.0,
+    "tax_rate": 21.0,
+    "tax_amount": 1916.46,
+    "total": 11042.46
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "file": "hard_01.pdf",
+  "layout": "scanned",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Northwind Logistics LLC",
+    "vendor_tax_id": "47-8821093",
+    "invoice_number": "NL-2026-2041",
+    "issue_date": "2026-04-07",
+    "due_date": "2026-05-07",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Freight forwarding, Seattle to Denver",
+        "quantity": 4.0,
+        "unit_price": 612.5,
+        "amount": 2450.0
+      },
+      {
+        "description": "Container handling fee",
+        "quantity": 2.0,
+        "unit_price": 148.0,
+        "amount": 296.0
+      },
+      {
+        "description": "Customs documentation handling",
+        "quantity": 3.0,
+        "unit_price": 92.4,
+        "amount": 277.2
+      },
+      {
+        "description": "Last-mile delivery surcharge",
+        "quantity": 6.0,
+        "unit_price": 54.8,
+        "amount": 328.8
+      }
+    ],
+    "subtotal": 3352.0,
+    "tax_rate": 8.25,
+    "tax_amount": 276.54,
+    "total": 3628.54
+  }
+}

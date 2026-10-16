@@ -1,0 +1,44 @@
+{
+  "file": "hard_11.pdf",
+  "layout": "factura_a",
+  "defect": "due_before_issue",
+  "expected_status": "needs_review",
+  "expected_issues": [
+    {
+      "code": "DUE_DATE_BEFORE_ISSUE_DATE",
+      "field": "due_date"
+    }
+  ],
+  "invoice": {
+    "vendor_name": "Distribuidora Andes S.A.",
+    "vendor_tax_id": "30-69874521-3",
+    "invoice_number": "0007-00002391",
+    "issue_date": "2026-02-26",
+    "due_date": "2026-02-11",
+    "currency": "ARS",
+    "line_items": [
+      {
+        "description": "Vino Malbec Reserva 750ml, caja x6",
+        "quantity": 120.0,
+        "unit_price": 28400.0,
+        "amount": 3408000.0
+      },
+      {
+        "description": "Aceite de oliva extra virgen 500ml, caja x12",
+        "quantity": 45.0,
+        "unit_price": 61200.0,
+        "amount": 2754000.0
+      },
+      {
+        "description": "Conservas artesanales surtidas, caja x24",
+        "quantity": 30.0,
+        "unit_price": 38900.0,
+        "amount": 1167000.0
+      }
+    ],
+    "subtotal": 7329000.0,
+    "tax_rate": 21.0,
+    "tax_amount": 1539090.0,
+    "total": 8868090.0
+  }
+}

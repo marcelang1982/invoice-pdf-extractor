@@ -1,0 +1,52 @@
+{
+  "file": "hard_09.pdf",
+  "layout": "messy",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Helvetia Cloud Systems AG",
+    "vendor_tax_id": "CHE-412.883.019 MWST",
+    "invoice_number": "HC-2026-2284",
+    "issue_date": "2026-04-24",
+    "due_date": "2026-05-24",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Managed Kubernetes cluster, monthly",
+        "quantity": 2.0,
+        "unit_price": 1180.0,
+        "amount": 2360.0
+      },
+      {
+        "description": "Object storage, per TB per month",
+        "quantity": 15.0,
+        "unit_price": 31.5,
+        "amount": 472.5
+      },
+      {
+        "description": "Egress bandwidth, per TB",
+        "quantity": 8.0,
+        "unit_price": 44.0,
+        "amount": 352.0
+      },
+      {
+        "description": "Dedicated load balancer",
+        "quantity": 3.0,
+        "unit_price": 86.0,
+        "amount": 258.0
+      },
+      {
+        "description": "Platform support, business tier",
+        "quantity": 1.0,
+        "unit_price": 540.0,
+        "amount": 540.0
+      }
+    ],
+    "subtotal": 3982.5,
+    "tax_rate": 21.0,
+    "tax_amount": 777.89,
+    "total": 4482.14
+  },
+  "notes": "Known limitation probe, not a document defect. The invoice is arithmetically correct: tax is charged on subtotal + discount + shipping. The Invoice schema has no field for a document-level discount or shipping charge, so subtotal + tax_amount != total and TOTAL_MISMATCH is expected to fire. Declared with no expected issue so the limitation shows up as a false positive rather than being scored as a success."
+}

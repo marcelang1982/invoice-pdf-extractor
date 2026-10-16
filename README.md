@@ -23,9 +23,17 @@ pip install -e ".[dev]"
 
 cp .env.example .env          # then add your ANTHROPIC_API_KEY
 
-python scripts/generate_samples.py                                  # 20 sample PDFs
+python scripts/generate_samples.py                                  # 20 clean sample PDFs
 python -m invoice_extractor extract samples/pdfs --out results.json  # extract + validate
-python scripts/evaluate.py --results results.json                   # score against ground truth
+python scripts/evaluate.py --set clean                              # score against ground truth
+```
+
+There is a second, deliberately harder corpus (scanned, multipage, Argentine):
+
+```bash
+python scripts/generate_hard_samples.py
+python -m invoice_extractor extract samples/hard/pdfs --out results_hard.json
+python scripts/evaluate.py --set hard --show-errors
 ```
 
 Cheap smoke test before spending tokens on all 20:
@@ -99,11 +107,23 @@ the flag needs to see all the candidates.
 
 ---
 
-## The sample corpus
+## The sample corpora
 
-`scripts/generate_samples.py` produces 20 fictitious invoices with reportlab —
-no real company, person, or tax ID appears anywhere. Each PDF gets a matching
-ground truth JSON in `samples/ground_truth/`.
+Two sets, scored separately and never pooled. All data is fictitious — no real
+company, person, or tax ID appears anywhere.
+
+| Set | Files | What it tests |
+| --- | --- | --- |
+| `clean` | 20 | The happy path: born-digital, well typeset, single page |
+| `hard` | 11 | What actually arrives: scans, multipage, wrapping, messy layouts, Argentine Factura A |
+
+A combined average would hide the only difference worth measuring, so
+`evaluate.py` takes `--set clean` or `--set hard` and reports each on its own.
+
+### The clean set
+
+`scripts/generate_samples.py` produces 20 invoices in `samples/pdfs/`, each
+with a matching ground truth JSON in `samples/ground_truth/`.
 
 The corpus is built to resist shortcuts:
 
@@ -139,6 +159,43 @@ broken total genuinely shows the wrong number on the page.
 That is 5 defects across **6 flagged files** — the duplicate implicates both
 sample 18 and sample 03.
 
+### The hard set
+
+A clean-set score says little about real invoices, because the clean set is
+born-digital, perfectly typeset, and single page. `scripts/generate_hard_samples.py`
+produces 11 invoices in `samples/hard/pdfs/` that introduce the conditions that
+actually show up:
+
+| Files | Kind | What it introduces |
+| --- | --- | --- |
+| 01–03 | `scanned` | Rasterized to 150dpi, defocused, rotated 1–2°, speckled, JPEG-compressed, repackaged as an **image-only PDF with no text layer** — extraction has to go through vision |
+| 04–05 | `multipage` | Items table continues onto page 2; totals appear only at the end |
+| 06–07 | `wrapped` | Descriptions long enough to wrap onto a second line inside the cell |
+| 08–09 | `messy` | Totals printed at the *top*, borderless detail table, discount and shipping lines |
+| 10–11 | `factura_a` | Argentine Factura A in Spanish: CUIT, single 21% IVA, `dd/mm/yyyy` dates, `1.234,56` comma decimals, ARS |
+
+Three carry a deliberate defect: a scanned invoice whose total doesn't add up
+(02), a multipage invoice with no tax ID on either page (05), and a Factura A
+whose payment due date precedes its issue date (11).
+
+**`hard_09` is a known-limitation probe, not a defect.** Its discount and
+shipping sit in the totals block rather than the items table, so the document is
+arithmetically correct but `subtotal + tax_amount != total` under our schema.
+Its ground truth declares **no** expected issue on purpose: the resulting
+`TOTAL_MISMATCH` should surface as a false positive, because that is what it is.
+Declaring it "expected" would score a schema gap as a success.
+
+#### Ground truth discipline
+
+Ground truth for the hard set was written, audited, and committed **before** the
+extractor was ever pointed at it. Every amount is spelled out in
+`generate_hard_samples.py` rather than sampled, so it can be reviewed by eye.
+
+The rule: **ground truth is not edited to make a case pass.** If a case fails,
+the first question is whether the extractor, the validator, or the ground truth
+is wrong — and if it really is the ground truth, the fix is explained rather
+than quietly applied.
+
 ---
 
 ## CLI
@@ -168,20 +225,24 @@ invoice_05.pdf   needs_review    2380  TOTAL_MISMATCH
 
 ## Evaluation
 
-`scripts/evaluate.py` compares `results.json` against the ground truth and
-reports two things:
+`scripts/evaluate.py` compares a run against its ground truth and reports three
+things:
 
 - **Field accuracy** — per-field correct/total across the corpus, so you can see
   *which* fields the model gets wrong rather than a single opaque score.
   Comparison is normalized: whitespace and case for strings, 0.01 tolerance for
-  money, ISO parsing for dates.
-- **Defect detection** — recall on the expected issues, plus false positives
-  (findings on invoices that should be clean). A validator that flags everything
-  would score 100% recall; the false-positive count is what keeps it honest.
+  money, ISO parsing for dates, and separators stripped from tax IDs (so
+  `47-8821093` and `478821093` match).
+- **Defect detection** — recall on the expected issues, plus unexpected findings
+  (flags raised on invoices that should be clean). A validator that flags
+  everything would score 100% recall; the unexpected-findings count is what
+  keeps it honest.
+- **Token cost** — per invoice and per set, so accuracy can be weighed against
+  what it costs to get.
 
 ```bash
-python scripts/evaluate.py --results results.json
-python scripts/evaluate.py --results results.json --show-errors   # per-field diffs
+python scripts/evaluate.py --set clean
+python scripts/evaluate.py --set hard --show-errors    # per-field diffs
 ```
 
 ---
@@ -229,6 +290,41 @@ print(batch.totals.total_tokens)
 - **The SDK's own retry layer is disabled** (`max_retries=0`) so backoff isn't
   applied twice.
 
+## Known limitations
+
+These are schema or scope gaps, not bugs. Each one is a deliberate Phase 1
+boundary with a known cost.
+
+**Multiple tax rates on one invoice.** `Invoice` carries a single `tax_rate` /
+`tax_amount` pair, so an invoice that charges 21% on some lines and 10.5% on
+others cannot be represented. This is common on Argentine Factura A, and on EU
+invoices mixing standard and reduced rates. Fixing it means moving tax onto the
+line item and adding a tax-summary breakdown — a schema change that ripples into
+the validator, the ground truth format, and the persistence layer in Phase 2, so
+it is scheduled rather than patched. The hard set deliberately uses a **single
+21% IVA** to stay inside the current schema.
+
+**Document-level discounts and shipping.** Same root cause: there is no field
+for a charge or credit that sits outside the line items. When they appear in the
+totals block rather than the items table, `subtotal + tax_amount != total` and
+`TOTAL_MISMATCH` fires on a perfectly correct invoice. `hard_09` exists to keep
+this measurable rather than forgotten.
+
+**Single currency per invoice**, taken as printed. No FX conversion, and no
+handling of invoices that quote two currencies side by side.
+
+**No line-item tax**, no withholding, no retentions (IIBB, Ganancias), no
+rounding-adjustment line.
+
+## Roadmap
+
+| Phase | Scope |
+| --- | --- |
+| **1** | Extraction + validation engine (this repo) |
+| 2 | Persistence and query layer. Carries the schema change for **multiple tax rates** and document-level discounts, since both need a migration anyway |
+| 3 | Web interface for review and correction |
+| 4 | Workflow automation and integrations |
+
 ## Testing
 
 ```bash
@@ -253,15 +349,6 @@ suite runs instantly.
 
 `.env` is gitignored. Existing environment variables take precedence over
 `.env`, so CI and one-off overrides work without editing the file.
-
-## Roadmap
-
-| Phase | Scope |
-| --- | --- |
-| **1** | Extraction + validation engine (this repo) |
-| 2 | Persistence and query layer |
-| 3 | Web interface for review and correction |
-| 4 | Workflow automation and integrations |
 
 ## License
 
