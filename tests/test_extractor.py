@@ -14,7 +14,7 @@ from invoice_extractor.extractor import TOOL_NAME, InvoiceExtractor, find_pdfs
 @pytest.fixture
 def settings() -> Settings:
     """Settings that never read the environment."""
-    return Settings(api_key="test-key", model="claude-haiku-4-5", max_retries=3)
+    return Settings(api_key="test-key", model="claude-haiku-5-5", max_retries=3)
 
 
 def build_extractor(responses, settings, sleeps=None):

@@ -52,7 +52,7 @@ def _build_parser() -> argparse.ArgumentParser:
     extract.add_argument(
         "--model",
         default=None,
-        help="Override the model from the environment, e.g. claude-haiku-4-5.",
+        help="Override the model from the environment, e.g. claude-haiku-5-5.",
     )
     extract.add_argument(
         "--limit",

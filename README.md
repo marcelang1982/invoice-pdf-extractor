@@ -247,7 +247,7 @@ suite runs instantly.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | — | Required to extract |
-| `MODEL` | `claude-haiku-4-5` | Any PDF-capable Claude model |
+| `MODEL` | `claude-haiku-5-5` | Any PDF-capable Claude model |
 | `MAX_RETRIES` | `3` | Attempts per PDF |
 | `MAX_TOKENS` | `4096` | Output cap; raise for very long invoices |
 

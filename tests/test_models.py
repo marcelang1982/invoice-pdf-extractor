@@ -67,7 +67,7 @@ def test_token_usage_adds_up():
 def test_batch_result_round_trips_through_json():
     """`results.json` must deserialize cleanly for evaluate.py and later phases."""
     batch = BatchResult(
-        model="claude-haiku-4-5",
+        model="claude-haiku-5-5",
         results=[
             FileResult(
                 file="invoice_01.pdf",

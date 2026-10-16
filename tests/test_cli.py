@@ -27,7 +27,7 @@ _REAL_FROM_ENV = Settings.from_env
 def batch() -> BatchResult:
     """A two-file batch: one clean, one flagged."""
     return BatchResult(
-        model="claude-haiku-4-5",
+        model="claude-haiku-5-5",
         results=[
             FileResult(
                 file="invoice_01.pdf",
@@ -137,7 +137,7 @@ def test_totals_line_reports_counts_tokens_and_model(batch):
 
     assert "2 files | 1 valid | 1 needs_review | 0 failed" in output
     assert "4100 in / 620 out" in output
-    assert "claude-haiku-4-5" in output
+    assert "claude-haiku-5-5" in output
 
 
 # --------------------------------------------------------------------------- #
@@ -176,7 +176,7 @@ def test_limit_truncates_the_batch(monkeypatch, tmp_path, pdf_dir, batch):
 
 
 def test_model_flag_overrides_the_environment(monkeypatch, tmp_path, pdf_dir, batch):
-    monkeypatch.setenv("MODEL", "claude-haiku-4-5")
+    monkeypatch.setenv("MODEL", "claude-haiku-5-5")
 
     _, captured = run_cli(
         monkeypatch,

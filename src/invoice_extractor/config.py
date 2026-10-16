@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
-DEFAULT_MODEL = "claude-haiku-4-5"
+DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_MAX_TOKENS = 4096
 
