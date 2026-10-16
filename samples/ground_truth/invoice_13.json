@@ -1,0 +1,33 @@
+{
+  "file": "invoice_13.pdf",
+  "layout": "classic",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Northwind Logistics LLC",
+    "vendor_tax_id": "47-8821093",
+    "invoice_number": "NL-2026-1095",
+    "issue_date": "2026-02-24",
+    "due_date": "2026-03-10",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Customs documentation handling",
+        "quantity": 8.0,
+        "unit_price": 94.15,
+        "amount": 753.2
+      },
+      {
+        "description": "Last-mile delivery surcharge",
+        "quantity": 6.0,
+        "unit_price": 40.72,
+        "amount": 244.32
+      }
+    ],
+    "subtotal": 997.52,
+    "tax_rate": 8.25,
+    "tax_amount": 82.3,
+    "total": 1079.82
+  }
+}

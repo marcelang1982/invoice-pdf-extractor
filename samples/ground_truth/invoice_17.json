@@ -1,0 +1,45 @@
+{
+  "file": "invoice_17.pdf",
+  "layout": "classic",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Ravenna Analytics BV",
+    "vendor_tax_id": "NL004991237B01",
+    "invoice_number": "RA-2026-1122",
+    "issue_date": "2026-01-25",
+    "due_date": "2026-02-08",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Model monitoring retainer, monthly",
+        "quantity": 3.0,
+        "unit_price": 1119.43,
+        "amount": 3358.29
+      },
+      {
+        "description": "Data pipeline engineering, hourly",
+        "quantity": 4.0,
+        "unit_price": 122.6,
+        "amount": 490.4
+      },
+      {
+        "description": "Dashboard build, fixed scope",
+        "quantity": 1.0,
+        "unit_price": 2349.34,
+        "amount": 2349.34
+      },
+      {
+        "description": "Data quality audit",
+        "quantity": 2.5,
+        "unit_price": 2053.28,
+        "amount": 5133.2
+      }
+    ],
+    "subtotal": 11331.23,
+    "tax_rate": 21.0,
+    "tax_amount": 2379.56,
+    "total": 13710.79
+  }
+}

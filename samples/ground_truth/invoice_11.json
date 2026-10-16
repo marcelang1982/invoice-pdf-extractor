@@ -1,0 +1,33 @@
+{
+  "file": "invoice_11.pdf",
+  "layout": "minimal",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Ravenna Analytics BV",
+    "vendor_tax_id": "NL004991237B01",
+    "invoice_number": "RA-2026-1080",
+    "issue_date": "2026-02-04",
+    "due_date": "2026-03-21",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Data pipeline engineering, hourly",
+        "quantity": 10.0,
+        "unit_price": 127.35,
+        "amount": 1273.5
+      },
+      {
+        "description": "Dashboard build, fixed scope",
+        "quantity": 4.0,
+        "unit_price": 1852.81,
+        "amount": 7411.24
+      }
+    ],
+    "subtotal": 8684.74,
+    "tax_rate": 21.0,
+    "tax_amount": 1823.8,
+    "total": 10508.54
+  }
+}

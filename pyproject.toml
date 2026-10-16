@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "invoice-extractor"
+version = "0.1.0"
+description = "Extract structured, validated data from invoice PDFs using Claude"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "anthropic>=0.40",
+    "pydantic>=2.6",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# reportlab is only needed to generate the synthetic sample PDFs, not to extract.
+samples = ["reportlab>=4.0"]
+dev = ["pytest>=8.0", "reportlab>=4.0"]
+
+[project.scripts]
+invoice-extractor = "invoice_extractor.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/invoice_extractor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

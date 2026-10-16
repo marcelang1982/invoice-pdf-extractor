@@ -1,0 +1,63 @@
+{
+  "file": "invoice_01.pdf",
+  "layout": "classic",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Northwind Logistics LLC",
+    "vendor_tax_id": "47-8821093",
+    "invoice_number": "NL-2026-1011",
+    "issue_date": "2026-03-21",
+    "due_date": "2026-05-05",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Temperature-controlled transit",
+        "quantity": 1.0,
+        "unit_price": 533.99,
+        "amount": 533.99
+      },
+      {
+        "description": "Warehouse storage, per pallet per week",
+        "quantity": 3.0,
+        "unit_price": 13.43,
+        "amount": 40.29
+      },
+      {
+        "description": "Pallet wrapping and labeling",
+        "quantity": 2.5,
+        "unit_price": 26.41,
+        "amount": 66.03
+      },
+      {
+        "description": "Customs documentation handling",
+        "quantity": 6.0,
+        "unit_price": 62.4,
+        "amount": 374.4
+      },
+      {
+        "description": "Last-mile delivery surcharge",
+        "quantity": 10.0,
+        "unit_price": 89.14,
+        "amount": 891.4
+      },
+      {
+        "description": "Container handling fee",
+        "quantity": 3.0,
+        "unit_price": 124.0,
+        "amount": 372.0
+      },
+      {
+        "description": "Freight forwarding, Seattle to Denver",
+        "quantity": 6.0,
+        "unit_price": 903.44,
+        "amount": 5420.64
+      }
+    ],
+    "subtotal": 7698.75,
+    "tax_rate": 8.25,
+    "tax_amount": 635.15,
+    "total": 8333.9
+  }
+}

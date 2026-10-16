@@ -1,0 +1,33 @@
+{
+  "file": "invoice_10.pdf",
+  "layout": "modern_boxed",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Delacroix Design Studio SARL",
+    "vendor_tax_id": "FR40992441870",
+    "invoice_number": "DD-2026-1070",
+    "issue_date": "2026-01-15",
+    "due_date": "2026-03-01",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Brand identity workshop, per day",
+        "quantity": 1.0,
+        "unit_price": 1522.31,
+        "amount": 1522.31
+      },
+      {
+        "description": "Illustration set, licensed",
+        "quantity": 1.0,
+        "unit_price": 993.19,
+        "amount": 993.19
+      }
+    ],
+    "subtotal": 2515.5,
+    "tax_rate": 20.0,
+    "tax_amount": 503.1,
+    "total": 3018.6
+  }
+}

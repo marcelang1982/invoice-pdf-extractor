@@ -1,0 +1,56 @@
+{
+  "file": "invoice_18.pdf",
+  "layout": "modern_boxed",
+  "defect": "duplicate",
+  "expected_status": "needs_review",
+  "expected_issues": [
+    {
+      "code": "DUPLICATE_INVOICE",
+      "field": "invoice_number"
+    }
+  ],
+  "invoice": {
+    "vendor_name": "Meridian Office Supply Co.",
+    "vendor_tax_id": "83-2290145",
+    "invoice_number": "MO-2026-1026",
+    "issue_date": "2026-03-05",
+    "due_date": "2026-04-04",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Monitor arm, dual mount",
+        "quantity": 10.0,
+        "unit_price": 77.27,
+        "amount": 772.7
+      },
+      {
+        "description": "Whiteboard, magnetic, 120x90cm",
+        "quantity": 3.0,
+        "unit_price": 149.1,
+        "amount": 447.3
+      },
+      {
+        "description": "Cable management tray",
+        "quantity": 10.0,
+        "unit_price": 41.42,
+        "amount": 414.2
+      },
+      {
+        "description": "Archive boxes, pack of 25",
+        "quantity": 2.0,
+        "unit_price": 30.84,
+        "amount": 61.68
+      },
+      {
+        "description": "Acoustic desk divider, felt",
+        "quantity": 10.0,
+        "unit_price": 102.35,
+        "amount": 1023.5
+      }
+    ],
+    "subtotal": 2719.38,
+    "tax_rate": 7.0,
+    "tax_amount": 190.36,
+    "total": 2909.74
+  }
+}

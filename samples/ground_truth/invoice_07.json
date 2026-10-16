@@ -1,0 +1,51 @@
+{
+  "file": "invoice_07.pdf",
+  "layout": "minimal",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Northwind Logistics LLC",
+    "vendor_tax_id": "47-8821093",
+    "invoice_number": "NL-2026-1049",
+    "issue_date": "2026-02-28",
+    "due_date": "2026-04-14",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Pallet wrapping and labeling",
+        "quantity": 2.0,
+        "unit_price": 34.88,
+        "amount": 69.76
+      },
+      {
+        "description": "Customs documentation handling",
+        "quantity": 10.0,
+        "unit_price": 111.34,
+        "amount": 1113.4
+      },
+      {
+        "description": "Warehouse storage, per pallet per week",
+        "quantity": 10.0,
+        "unit_price": 25.97,
+        "amount": 259.7
+      },
+      {
+        "description": "Proof-of-delivery scanning",
+        "quantity": 2.0,
+        "unit_price": 14.93,
+        "amount": 29.86
+      },
+      {
+        "description": "Temperature-controlled transit",
+        "quantity": 4.0,
+        "unit_price": 561.77,
+        "amount": 2247.08
+      }
+    ],
+    "subtotal": 3719.8,
+    "tax_rate": 8.25,
+    "tax_amount": 306.88,
+    "total": 4026.68
+  }
+}

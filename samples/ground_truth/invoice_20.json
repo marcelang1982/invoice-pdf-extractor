@@ -1,0 +1,45 @@
+{
+  "file": "invoice_20.pdf",
+  "layout": "two_column",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Helvetia Cloud Systems AG",
+    "vendor_tax_id": "CHE-412.883.019 MWST",
+    "invoice_number": "HC-2026-1143",
+    "issue_date": "2026-01-07",
+    "due_date": "2026-01-21",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Object storage, per TB per month",
+        "quantity": 1.0,
+        "unit_price": 18.14,
+        "amount": 18.14
+      },
+      {
+        "description": "Dedicated load balancer",
+        "quantity": 10.0,
+        "unit_price": 84.51,
+        "amount": 845.1
+      },
+      {
+        "description": "Managed Kubernetes cluster, monthly",
+        "quantity": 1.0,
+        "unit_price": 1298.72,
+        "amount": 1298.72
+      },
+      {
+        "description": "Platform support, business tier",
+        "quantity": 6.0,
+        "unit_price": 551.9,
+        "amount": 3311.4
+      }
+    ],
+    "subtotal": 5473.36,
+    "tax_rate": 21.0,
+    "tax_amount": 1149.41,
+    "total": 6622.77
+  }
+}

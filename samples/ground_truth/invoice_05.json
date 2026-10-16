@@ -1,0 +1,44 @@
+{
+  "file": "invoice_05.pdf",
+  "layout": "classic",
+  "defect": "total_mismatch",
+  "expected_status": "needs_review",
+  "expected_issues": [
+    {
+      "code": "TOTAL_MISMATCH",
+      "field": "total"
+    }
+  ],
+  "invoice": {
+    "vendor_name": "Ravenna Analytics BV",
+    "vendor_tax_id": "NL004991237B01",
+    "invoice_number": "RA-2026-1038",
+    "issue_date": "2026-02-07",
+    "due_date": "2026-02-28",
+    "currency": "EUR",
+    "line_items": [
+      {
+        "description": "Dashboard build, fixed scope",
+        "quantity": 3.0,
+        "unit_price": 2038.3,
+        "amount": 6114.9
+      },
+      {
+        "description": "Data quality audit",
+        "quantity": 6.0,
+        "unit_price": 1797.66,
+        "amount": 10785.96
+      },
+      {
+        "description": "Data pipeline engineering, hourly",
+        "quantity": 1.0,
+        "unit_price": 156.26,
+        "amount": 156.26
+      }
+    ],
+    "subtotal": 17057.12,
+    "tax_rate": 21.0,
+    "tax_amount": 3582.0,
+    "total": 20679.12
+  }
+}

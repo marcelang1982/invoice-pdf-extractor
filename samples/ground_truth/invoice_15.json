@@ -1,0 +1,39 @@
+{
+  "file": "invoice_15.pdf",
+  "layout": "minimal",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Meridian Office Supply Co.",
+    "vendor_tax_id": "83-2290145",
+    "invoice_number": "MO-2026-1108",
+    "issue_date": "2026-03-10",
+    "due_date": "2026-03-31",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Height-adjustable desk, 160x80cm",
+        "quantity": 10.0,
+        "unit_price": 462.93,
+        "amount": 4629.3
+      },
+      {
+        "description": "Monitor arm, dual mount",
+        "quantity": 12.0,
+        "unit_price": 96.57,
+        "amount": 1158.84
+      },
+      {
+        "description": "Ergonomic task chair, charcoal",
+        "quantity": 10.0,
+        "unit_price": 409.86,
+        "amount": 4098.6
+      }
+    ],
+    "subtotal": 9886.74,
+    "tax_rate": 7.0,
+    "tax_amount": 692.07,
+    "total": 10578.81
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "file": "invoice_19.pdf",
+  "layout": "minimal",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Northwind Logistics LLC",
+    "vendor_tax_id": "47-8821093",
+    "invoice_number": "NL-2026-1133",
+    "issue_date": "2026-01-22",
+    "due_date": "2026-02-12",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Proof-of-delivery scanning",
+        "quantity": 1.0,
+        "unit_price": 14.14,
+        "amount": 14.14
+      },
+      {
+        "description": "Customs documentation handling",
+        "quantity": 2.5,
+        "unit_price": 133.86,
+        "amount": 334.65
+      }
+    ],
+    "subtotal": 348.79,
+    "tax_rate": 8.25,
+    "tax_amount": 28.78,
+    "total": 377.57
+  }
+}

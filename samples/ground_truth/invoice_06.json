@@ -1,0 +1,51 @@
+{
+  "file": "invoice_06.pdf",
+  "layout": "modern_boxed",
+  "defect": null,
+  "expected_status": "valid",
+  "expected_issues": [],
+  "invoice": {
+    "vendor_name": "Cascade Freight Partners Inc",
+    "vendor_tax_id": "91-4410228",
+    "invoice_number": "CF-2026-1043",
+    "issue_date": "2026-02-27",
+    "due_date": "2026-04-13",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Reconsignment fee",
+        "quantity": 6.0,
+        "unit_price": 84.71,
+        "amount": 508.26
+      },
+      {
+        "description": "LTL shipment, zone 4",
+        "quantity": 10.0,
+        "unit_price": 458.99,
+        "amount": 4589.9
+      },
+      {
+        "description": "Residential delivery fee",
+        "quantity": 8.0,
+        "unit_price": 43.66,
+        "amount": 349.28
+      },
+      {
+        "description": "Fuel surcharge",
+        "quantity": 2.5,
+        "unit_price": 151.83,
+        "amount": 379.58
+      },
+      {
+        "description": "Liftgate service",
+        "quantity": 2.0,
+        "unit_price": 90.93,
+        "amount": 181.86
+      }
+    ],
+    "subtotal": 6008.88,
+    "tax_rate": 0.0,
+    "tax_amount": 0.0,
+    "total": 6008.88
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "file": "invoice_09.pdf",
+  "layout": "classic",
+  "defect": "missing_tax_id",
+  "expected_status": "needs_review",
+  "expected_issues": [
+    {
+      "code": "MISSING_REQUIRED_FIELD",
+      "field": "vendor_tax_id"
+    }
+  ],
+  "invoice": {
+    "vendor_name": "Meridian Office Supply Co.",
+    "vendor_tax_id": null,
+    "invoice_number": "MO-2026-1068",
+    "issue_date": "2026-02-11",
+    "due_date": "2026-03-04",
+    "currency": "USD",
+    "line_items": [
+      {
+        "description": "Acoustic desk divider, felt",
+        "quantity": 3.0,
+        "unit_price": 139.3,
+        "amount": 417.9
+      },
+      {
+        "description": "Desk lamp, LED, dimmable",
+        "quantity": 8.0,
+        "unit_price": 41.95,
+        "amount": 335.6
+      }
+    ],
+    "subtotal": 753.5,
+    "tax_rate": 7.0,
+    "tax_amount": 52.74,
+    "total": 806.24
+  }
+}
