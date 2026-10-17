@@ -62,17 +62,22 @@ def validate_invoice(invoice: Invoice) -> ValidationResult:
 
 def validate_batch(
     invoices: Mapping[str, Invoice | None],
+    known_keys: Mapping[tuple[str, str], str] | None = None,
 ) -> dict[str, ValidationResult]:
     """Validate a whole batch, including cross-invoice duplicate detection.
 
     Args:
         invoices: Maps a file name to its extracted invoice, or to `None` when
             extraction failed for that file.
+        known_keys: Duplicate keys already on record, mapped to the identifier
+            of the invoice holding them. Lets a batch be checked against a
+            store, not just against itself. Build keys with `duplicate_key` so
+            the normalization cannot drift.
 
     Returns:
         A result per input key, in the same order.
     """
-    duplicates = find_duplicates(invoices)
+    duplicates = find_duplicates(invoices, known_keys)
 
     results: dict[str, ValidationResult] = {}
     for name, invoice in invoices.items():
@@ -99,45 +104,75 @@ def validate_batch(
 
 def find_duplicates(
     invoices: Mapping[str, Invoice | None],
+    known_keys: Mapping[tuple[str, str], str] | None = None,
 ) -> dict[str, ValidationIssue]:
     """Flag invoices sharing a vendor and invoice number.
 
-    Every member of a duplicate group is flagged, not just the later ones: from
-    the batch's point of view there is no principled "original", and a human
-    needs to look at all of them.
+    Two sources of duplication are checked together: other invoices in the same
+    batch, and keys already on record in `known_keys`. An invoice matching both
+    gets a single finding naming both, rather than two findings for one problem.
+
+    Every member of an in-batch duplicate group is flagged, not just the later
+    ones: from the batch's point of view there is no principled "original", and
+    a human needs to look at all of them. A match against `known_keys` is
+    different — there the stored invoice *is* the original, so its identifier
+    goes on the issue's `related_id`.
+
+    Args:
+        invoices: File name to extracted invoice, or `None` where extraction
+            failed. Failed extractions are skipped.
+        known_keys: Keys already on record, mapped to the identifier of the
+            invoice holding each one.
 
     Returns:
         An issue per offending file name. Files with a unique key are absent.
     """
+    known = known_keys or {}
     groups: dict[tuple[str, str], list[str]] = defaultdict(list)
 
     for name, invoice in invoices.items():
         if invoice is None:
             continue
-        key = _duplicate_key(invoice)
+        key = duplicate_key(invoice)
         if key is not None:
             groups[key].append(name)
 
     issues: dict[str, ValidationIssue] = {}
-    for (vendor, number), names in groups.items():
-        if len(names) < 2:
+    for key, names in groups.items():
+        vendor, number = key
+        stored = known.get(key)
+        if len(names) < 2 and stored is None:
             continue
+
         for name in names:
-            others = ", ".join(sorted(n for n in names if n != name))
+            others = sorted(n for n in names if n != name)
+            clauses: list[str] = []
+            if others:
+                clauses.append(f"also appears in: {', '.join(others)}")
+            if stored is not None:
+                clauses.append(f"is already stored as invoice {stored}")
+
             issues[name] = ValidationIssue(
                 code=IssueCode.DUPLICATE_INVOICE,
                 field="invoice_number",
                 message=(
-                    f"Invoice number {number!r} from vendor {vendor!r} also "
-                    f"appears in: {others}."
+                    f"Invoice number {number!r} from vendor {vendor!r} "
+                    f"{' and '.join(clauses)}."
                 ),
+                related_id=stored,
             )
 
     return issues
 
 
-def _duplicate_key(invoice: Invoice) -> tuple[str, str] | None:
-    """Normalized (vendor, number) identity, or `None` if either is missing."""
+def duplicate_key(invoice: Invoice) -> tuple[str, str] | None:
+    """Normalized (vendor, number) identity, or `None` if either is missing.
+
+    Public because anything maintaining a store of past invoices has to build
+    `known_keys` with exactly this normalization. A second implementation would
+    drift, and the two would silently disagree about what "the same invoice"
+    means.
+    """
     if not invoice.vendor_name or not invoice.invoice_number:
         return None
     return (

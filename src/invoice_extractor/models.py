@@ -156,6 +156,14 @@ class ValidationIssue(BaseModel):
     code: IssueCode
     field: str
     message: str
+    related_id: str | None = Field(
+        default=None,
+        description=(
+            "Reference to a related record, when the finding is about one. A "
+            "duplicate carries the identifier of the already-stored invoice it "
+            "matches. Opaque to the engine: the caller decides what it means."
+        ),
+    )
 
 
 #: How the totals check was satisfied. `direct` means subtotal + tax == total;

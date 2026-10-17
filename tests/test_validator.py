@@ -8,6 +8,7 @@ from invoice_extractor.models import Invoice, IssueCode
 from invoice_extractor.validator import (
     MAX_TAX_RATE,
     REQUIRED_FIELDS,
+    duplicate_key,
     find_duplicates,
     validate_batch,
     validate_invoice,
@@ -433,6 +434,102 @@ def test_failed_extractions_are_skipped_by_duplicate_detection(invoice_data):
     batch = {"a.pdf": build(invoice_data), "b.pdf": None}
 
     assert find_duplicates(batch) == {}
+
+
+# --------------------------------------------------------------------------- #
+# Duplicates against an existing store
+# --------------------------------------------------------------------------- #
+
+
+def test_duplicate_key_normalizes_case_and_whitespace(invoice_data):
+    key = duplicate_key(build(invoice_data, vendor_name="  NORTHWIND  ",
+                              invoice_number=" NL-1 "))
+
+    assert key == ("northwind", "nl-1")
+
+
+@pytest.mark.parametrize("missing", ["vendor_name", "invoice_number"])
+def test_duplicate_key_is_none_without_an_identity(invoice_data, missing):
+    assert duplicate_key(build(invoice_data, **{missing: None})) is None
+
+
+def test_a_key_already_on_record_is_flagged(invoice_data):
+    invoice = build(invoice_data)
+    known = {duplicate_key(invoice): "17"}
+
+    duplicates = find_duplicates({"a.pdf": invoice}, known)
+
+    assert duplicates["a.pdf"].code is IssueCode.DUPLICATE_INVOICE
+    assert duplicates["a.pdf"].related_id == "17"
+    assert "already stored as invoice 17" in duplicates["a.pdf"].message
+
+
+def test_known_keys_match_through_the_same_normalization(invoice_data):
+    """The store's key and the batch's key must agree on casing and spacing."""
+    stored = build(invoice_data, vendor_name="NORTHWIND LOGISTICS LLC  ",
+                   invoice_number="  nl-2026-1011")
+    incoming = build(invoice_data)
+
+    duplicates = find_duplicates({"a.pdf": incoming}, {duplicate_key(stored): "5"})
+
+    assert "a.pdf" in duplicates
+
+
+def test_a_key_not_on_record_is_not_flagged(invoice_data):
+    known = {("someone else", "other-number"): "9"}
+
+    assert find_duplicates({"a.pdf": build(invoice_data)}, known) == {}
+
+
+def test_batch_and_stored_duplicates_produce_one_finding(invoice_data):
+    """One problem, one issue — naming both the sibling file and the record."""
+    invoice = build(invoice_data)
+    known = {duplicate_key(invoice): "42"}
+
+    duplicates = find_duplicates(
+        {"a.pdf": invoice, "b.pdf": build(invoice_data)}, known
+    )
+
+    assert set(duplicates) == {"a.pdf", "b.pdf"}
+    message = duplicates["a.pdf"].message
+    assert "b.pdf" in message
+    assert "already stored as invoice 42" in message
+    assert duplicates["a.pdf"].related_id == "42"
+
+
+def test_known_keys_default_to_nothing(invoice_data):
+    """Omitting the argument must behave exactly as before."""
+    batch = {"a.pdf": build(invoice_data)}
+
+    assert find_duplicates(batch) == find_duplicates(batch, None) == {}
+
+
+def test_in_batch_duplicates_carry_no_related_id(invoice_data):
+    """Within a batch there is no original, so there is nothing to point at."""
+    duplicates = find_duplicates(
+        {"a.pdf": build(invoice_data), "b.pdf": build(invoice_data)}
+    )
+
+    assert duplicates["a.pdf"].related_id is None
+
+
+def test_validate_batch_forwards_known_keys(invoice_data):
+    invoice = build(invoice_data)
+
+    results = validate_batch({"a.pdf": invoice}, {duplicate_key(invoice): "3"})
+
+    assert results["a.pdf"].status == "needs_review"
+    assert codes(results["a.pdf"]) == {IssueCode.DUPLICATE_INVOICE.value}
+    assert results["a.pdf"].issues[0].related_id == "3"
+
+
+def test_a_single_invoice_can_be_checked_against_the_store(invoice_data):
+    """The web layer validates one upload at a time, not a batch."""
+    invoice = build(invoice_data)
+
+    results = validate_batch({"upload.pdf": invoice}, {duplicate_key(invoice): "8"})
+
+    assert IssueCode.DUPLICATE_INVOICE.value in codes(results["upload.pdf"])
 
 
 # --------------------------------------------------------------------------- #
