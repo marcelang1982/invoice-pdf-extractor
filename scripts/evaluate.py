@@ -49,6 +49,7 @@ SCALAR_FIELDS: tuple[str, ...] = (
     "due_date",
     "currency",
     "subtotal",
+    "taxable_base",
     "tax_rate",
     "tax_amount",
     "total",
@@ -56,11 +57,23 @@ SCALAR_FIELDS: tuple[str, ...] = (
 
 #: Numeric fields compared with a tolerance rather than for equality.
 NUMERIC_FIELDS = frozenset(
-    {"subtotal", "tax_rate", "tax_amount", "total", "quantity", "unit_price", "amount"}
+    {
+        "subtotal",
+        "taxable_base",
+        "tax_rate",
+        "tax_amount",
+        "total",
+        "quantity",
+        "unit_price",
+        "amount",
+    }
 )
 
 #: Fields per line item, scored positionally.
 LINE_FIELDS: tuple[str, ...] = ("description", "quantity", "unit_price", "amount")
+
+#: Fields per document-level adjustment, scored positionally.
+ADJUSTMENT_FIELDS: tuple[str, ...] = ("description", "amount", "kind")
 
 TOLERANCE = 0.01
 
@@ -113,6 +126,8 @@ class Report:
     scalar: dict[str, FieldScore] = field(default_factory=dict)
     line_fields: dict[str, FieldScore] = field(default_factory=dict)
     line_count: FieldScore = field(default_factory=FieldScore)
+    adjustment_fields: dict[str, FieldScore] = field(default_factory=dict)
+    adjustment_count: FieldScore = field(default_factory=FieldScore)
     mismatches: list[Mismatch] = field(default_factory=list)
 
     expected_issues: int = 0
@@ -135,8 +150,10 @@ class Report:
         total = sum(s.total for s in self.scalar.values())
         correct += sum(s.correct for s in self.line_fields.values())
         total += sum(s.total for s in self.line_fields.values())
-        correct += self.line_count.correct
-        total += self.line_count.total
+        correct += sum(s.correct for s in self.adjustment_fields.values())
+        total += sum(s.total for s in self.adjustment_fields.values())
+        correct += self.line_count.correct + self.adjustment_count.correct
+        total += self.line_count.total + self.adjustment_count.total
         return correct / total if total else 0.0
 
     @property
@@ -149,6 +166,7 @@ def evaluate(batch: BatchResult, truth_by_file: dict[str, dict]) -> Report:
     report = Report(
         scalar={name: FieldScore() for name in SCALAR_FIELDS},
         line_fields={name: FieldScore() for name in LINE_FIELDS},
+        adjustment_fields={name: FieldScore() for name in ADJUSTMENT_FIELDS},
     )
 
     for result in batch.results:
@@ -173,6 +191,7 @@ def evaluate(batch: BatchResult, truth_by_file: dict[str, dict]) -> Report:
             for name in SCALAR_FIELDS:
                 report.scalar[name].total += 1
             report.line_count.total += 1
+            report.adjustment_count.total += 1
             continue
 
         _score_fields(result.file, result.invoice.model_dump(), truth["invoice"], report)
@@ -194,33 +213,53 @@ def _score_fields(
                 Mismatch(file, name, expected.get(name), actual.get(name))
             )
 
-    expected_lines = expected.get("line_items") or []
-    actual_lines = actual.get("line_items") or []
+    _score_list(
+        file, "line_items", LINE_FIELDS, expected, actual,
+        report.line_count, report.line_fields, report,
+    )
+    _score_list(
+        file, "adjustments", ADJUSTMENT_FIELDS, expected, actual,
+        report.adjustment_count, report.adjustment_fields, report,
+    )
 
-    report.line_count.total += 1
-    if len(expected_lines) == len(actual_lines):
-        report.line_count.correct += 1
+
+def _score_list(
+    file: str,
+    key: str,
+    fields: tuple[str, ...],
+    expected: dict,
+    actual: dict,
+    count_score: FieldScore,
+    field_scores: dict[str, FieldScore],
+    report: Report,
+) -> None:
+    """Score a repeated sub-object (line items, adjustments) positionally."""
+    expected_rows = expected.get(key) or []
+    actual_rows = actual.get(key) or []
+
+    count_score.total += 1
+    if len(expected_rows) == len(actual_rows):
+        count_score.correct += 1
     else:
         report.mismatches.append(
-            Mismatch(file, "line_items (count)", len(expected_lines), len(actual_lines))
+            Mismatch(file, f"{key} (count)", len(expected_rows), len(actual_rows))
         )
 
-    # Score positionally over the expected lines. A short result scores the
-    # missing lines as wrong rather than quietly skipping them.
-    for index, expected_line in enumerate(expected_lines):
-        actual_line = actual_lines[index] if index < len(actual_lines) else {}
-        for name in LINE_FIELDS:
-            score = report.line_fields[name]
+    # A short result scores its missing rows as wrong rather than skipping them.
+    for index, expected_row in enumerate(expected_rows):
+        actual_row = actual_rows[index] if index < len(actual_rows) else {}
+        for name in fields:
+            score = field_scores[name]
             score.total += 1
-            if _matches(name, expected_line.get(name), actual_line.get(name)):
+            if _matches(name, expected_row.get(name), actual_row.get(name)):
                 score.correct += 1
             else:
                 report.mismatches.append(
                     Mismatch(
                         file,
-                        f"line_items[{index}].{name}",
-                        expected_line.get(name),
-                        actual_line.get(name),
+                        f"{key}[{index}].{name}",
+                        expected_row.get(name),
+                        actual_row.get(name),
                     )
                 )
 
@@ -287,6 +326,9 @@ def print_report(report: Report, *, show_errors: bool, set_name: str = "") -> No
     _print_score("line_items (count)", report.line_count)
     for name in LINE_FIELDS:
         _print_score(f"line_items[].{name}", report.line_fields[name])
+    _print_score("adjustments (count)", report.adjustment_count)
+    for name in ADJUSTMENT_FIELDS:
+        _print_score(f"adjustments[].{name}", report.adjustment_fields[name])
 
     print("-" * 62)
     print(f"{'OVERALL':<28} {'':>9} {'':>7} {report.field_accuracy:>9.1%}")
@@ -372,7 +414,10 @@ def print_cost(report: Report) -> None:
 
 
 def _print_score(label: str, score: FieldScore) -> None:
-    print(f"{label:<28} {score.correct:>9} {score.total:>7} {score.accuracy:>9.1%}")
+    # A field the corpus never exercises has no accuracy, which is different
+    # from an accuracy of zero.
+    accuracy = f"{score.accuracy:.1%}" if score.total else "n/a"
+    print(f"{label:<28} {score.correct:>9} {score.total:>7} {accuracy:>10}")
 
 
 def _ratio(correct: int, total: int) -> float:

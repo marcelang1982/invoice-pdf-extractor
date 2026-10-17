@@ -164,6 +164,134 @@ def test_total_check_skipped_without_a_subtotal(invoice_data):
 
 
 # --------------------------------------------------------------------------- #
+# Document-level adjustments: the adjusted totals path
+# --------------------------------------------------------------------------- #
+#
+# The fixture invoice has line items summing to 250.00. An adjusted invoice
+# discounts 25.00 and adds 10.00 of shipping, so tax is charged on 235.00
+# rather than on the 250.00 subtotal:
+#
+#     250.00 - 25.00 + 10.00 = 235.00   taxable base
+#     235.00 x 10%            =  23.50   tax
+#     235.00 + 23.50          = 258.50   total
+#
+# The direct path (250.00 + 23.50 = 273.50) cannot close this, by design.
+
+DISCOUNT = {"description": "Volume discount", "amount": -25.0, "kind": "discount"}
+SHIPPING = {"description": "Shipping", "amount": 10.0, "kind": "shipping"}
+
+
+def adjusted(invoice_data: dict, **overrides) -> Invoice:
+    """The fixture invoice with document-level adjustments applied."""
+    defaults = {
+        "adjustments": [DISCOUNT, SHIPPING],
+        "tax_amount": 23.50,
+        "total": 258.50,
+    }
+    return build(invoice_data, **{**defaults, **overrides})
+
+
+def test_ordinary_invoice_closes_on_the_direct_path(valid_invoice):
+    result = validate_invoice(valid_invoice)
+
+    assert result.status == "valid"
+    assert result.totals_path == "direct"
+
+
+def test_adjusted_invoice_closes_with_a_derived_taxable_base(invoice_data):
+    """The document does not print the base, so the validator derives it."""
+    result = validate_invoice(adjusted(invoice_data))
+
+    assert result.status == "valid"
+    assert result.totals_path == "adjusted"
+
+
+def test_adjusted_invoice_closes_with_a_printed_taxable_base(invoice_data):
+    result = validate_invoice(adjusted(invoice_data, taxable_base=235.0))
+
+    assert result.status == "valid"
+    assert result.totals_path == "adjusted"
+
+
+def test_printed_taxable_base_must_match_subtotal_plus_adjustments(invoice_data):
+    result = validate_invoice(adjusted(invoice_data, taxable_base=240.0))
+
+    assert IssueCode.TOTAL_MISMATCH.value in codes(result)
+    assert result.totals_path is None
+    assert "taxable base" in result.issues[0].message
+
+
+def test_tax_must_match_the_rate_applied_to_the_taxable_base(invoice_data):
+    """Base and total agree, but the tax charged is not the stated rate."""
+    result = validate_invoice(adjusted(invoice_data, tax_amount=30.0, total=265.0))
+
+    assert IssueCode.TOTAL_MISMATCH.value in codes(result)
+    assert "of the taxable base" in result.issues[0].message
+
+
+def test_taxable_base_plus_tax_must_reach_the_total(invoice_data):
+    result = validate_invoice(adjusted(invoice_data, total=999.0))
+
+    assert IssueCode.TOTAL_MISMATCH.value in codes(result)
+    assert result.totals_path is None
+
+
+def test_an_adjustment_that_does_not_close_is_still_flagged(invoice_data):
+    """Shipping is missing from the adjustments, so nothing reconciles."""
+    result = validate_invoice(
+        build(invoice_data, adjustments=[DISCOUNT], tax_amount=23.50, total=258.50)
+    )
+
+    assert IssueCode.TOTAL_MISMATCH.value in codes(result)
+    assert result.totals_path is None
+
+
+def test_mismatch_message_reports_both_attempted_paths(invoice_data):
+    result = validate_invoice(adjusted(invoice_data, total=999.0))
+    message = result.issues[0].message
+
+    assert "Direct:" in message
+    assert "With adjustments:" in message
+
+
+def test_adjusted_path_skips_the_rate_check_without_a_rate(invoice_data):
+    """No stated rate means the tax cannot be re-derived, only reconciled."""
+    result = validate_invoice(adjusted(invoice_data, tax_rate=None))
+
+    assert result.status == "valid"
+    assert result.totals_path == "adjusted"
+
+
+@pytest.mark.parametrize("total", [258.50, 258.51, 258.49])
+def test_adjusted_path_honours_the_tolerance(invoice_data, total):
+    result = validate_invoice(adjusted(invoice_data, total=total))
+
+    assert IssueCode.TOTAL_MISMATCH.value not in codes(result)
+
+
+def test_adjusted_path_is_not_attempted_without_adjustments(invoice_data):
+    """A plain broken total must not be excused by an empty adjustment list."""
+    result = validate_invoice(build(invoice_data, total=999.0))
+
+    assert IssueCode.TOTAL_MISMATCH.value in codes(result)
+    assert "With adjustments" not in result.issues[0].message
+
+
+def test_adjustments_do_not_affect_the_line_items_sum(invoice_data):
+    """Adjustments sit outside the subtotal, so the sum check is unchanged."""
+    result = validate_invoice(adjusted(invoice_data))
+
+    assert IssueCode.LINE_ITEMS_SUM_MISMATCH.value not in codes(result)
+
+
+def test_totals_path_survives_batch_validation(invoice_data):
+    """Duplicate detection must not drop the reconciliation path."""
+    results = validate_batch({"a.pdf": adjusted(invoice_data)})
+
+    assert results["a.pdf"].totals_path == "adjusted"
+
+
+# --------------------------------------------------------------------------- #
 # Tax rate
 # --------------------------------------------------------------------------- #
 

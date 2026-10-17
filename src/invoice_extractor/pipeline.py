@@ -66,6 +66,7 @@ def process_paths(
                 file=item.file,
                 status=validation.status,
                 issues=validation.issues,
+                totals_path=validation.totals_path,
                 invoice=item.invoice,
                 usage=item.usage,
                 attempts=item.attempts,

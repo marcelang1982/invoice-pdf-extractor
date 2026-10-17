@@ -12,6 +12,8 @@ Public API, stable for the phases built on top of this package:
 from .config import ConfigError, Settings
 from .extractor import ExtractionError, InvoiceExtractor, find_pdfs
 from .models import (
+    Adjustment,
+    AdjustmentKind,
     BatchResult,
     BatchTotals,
     ExtractionResult,
@@ -20,6 +22,7 @@ from .models import (
     IssueCode,
     LineItem,
     TokenUsage,
+    TotalsPath,
     ValidationIssue,
     ValidationResult,
     invoice_input_schema,
@@ -30,6 +33,8 @@ from .validator import find_duplicates, validate_batch, validate_invoice
 __version__ = "0.1.0"
 
 __all__ = [
+    "Adjustment",
+    "AdjustmentKind",
     "BatchResult",
     "BatchTotals",
     "ConfigError",
@@ -42,6 +47,7 @@ __all__ = [
     "LineItem",
     "Settings",
     "TokenUsage",
+    "TotalsPath",
     "ValidationIssue",
     "ValidationResult",
     "__version__",

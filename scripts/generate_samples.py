@@ -847,6 +847,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--seed", type=int, default=20260216, help="Seed for reproducible amounts."
     )
+    parser.add_argument(
+        "--skip-pdfs",
+        action="store_true",
+        help=(
+            "Rewrite ground truth without re-rendering the PDFs. Renders embed "
+            "a creation timestamp, so re-rendering churns every file even when "
+            "nothing about the invoice changed."
+        ),
+    )
     args = parser.parse_args(argv)
 
     pdf_dir = args.out_dir / "pdfs"
@@ -856,7 +865,8 @@ def main(argv: list[str] | None = None) -> int:
 
     samples = build_samples(args.seed)
     for sample in samples:
-        render_sample(sample, pdf_dir)
+        if not args.skip_pdfs:
+            render_sample(sample, pdf_dir)
         write_ground_truth(sample, truth_dir)
         flag = f"  <- {sample.defect}" if sample.defect else ""
         print(

@@ -11,7 +11,13 @@ from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date
 
-from .models import Invoice, IssueCode, ValidationIssue, ValidationResult
+from .models import (
+    Invoice,
+    IssueCode,
+    TotalsPath,
+    ValidationIssue,
+    ValidationResult,
+)
 
 #: Money comparisons tolerate half a cent of rounding on each side.
 TOLERANCE = 0.01
@@ -37,14 +43,21 @@ def validate_invoice(invoice: Invoice) -> ValidationResult:
 
     Duplicate detection needs the whole batch and is not applied here; use
     `validate_batch` for that.
+
+    The returned result carries `totals_path`, recording which reconciliation
+    closed the arithmetic: `direct` for subtotal + tax == total, `adjusted` when
+    it only closed after applying document-level adjustments.
     """
     issues: list[ValidationIssue] = []
     issues.extend(_check_required_fields(invoice))
     issues.extend(_check_line_items(invoice))
-    issues.extend(_check_totals(invoice))
+
+    totals_issues, totals_path = _check_totals(invoice)
+    issues.extend(totals_issues)
+
     issues.extend(_check_tax_rate(invoice))
     issues.extend(_check_dates(invoice))
-    return ValidationResult.from_issues(issues)
+    return ValidationResult.from_issues(issues, totals_path)
 
 
 def validate_batch(
@@ -75,10 +88,11 @@ def validate_batch(
             )
             continue
 
-        issues = list(validate_invoice(invoice).issues)
+        single = validate_invoice(invoice)
+        issues = list(single.issues)
         if name in duplicates:
             issues.append(duplicates[name])
-        results[name] = ValidationResult.from_issues(issues)
+        results[name] = ValidationResult.from_issues(issues, single.totals_path)
 
     return results
 
@@ -195,30 +209,112 @@ def _check_line_items(invoice: Invoice) -> list[ValidationIssue]:
     return issues
 
 
-def _check_totals(invoice: Invoice) -> list[ValidationIssue]:
-    """Check subtotal + tax_amount == total.
+def _check_totals(
+    invoice: Invoice,
+) -> tuple[list[ValidationIssue], TotalsPath | None]:
+    """Reconcile the totals, trying the simple arithmetic first.
+
+    Two paths, in order:
+
+    1. **direct** - ``subtotal + tax_amount == total``. Covers the ordinary
+       invoice, where tax is charged on the subtotal.
+    2. **adjusted** - only attempted when the invoice carries document-level
+       adjustments or states a taxable base. Tax is charged on
+       ``subtotal + sum(adjustments)`` rather than on the subtotal, so all
+       three of these must hold: the adjustments reach the stated taxable base,
+       the tax matches the rate applied to that base, and base + tax reaches
+       the total.
 
     A missing `tax_amount` is read as zero tax rather than skipped: plenty of
     real invoices omit the line, and `subtotal == total` should still hold.
+
+    Returns:
+        The issues found (empty when the totals reconcile) and the path that
+        closed, or `None` if neither did.
     """
     if invoice.subtotal is None or invoice.total is None:
-        return []
+        return [], None
 
     tax = invoice.tax_amount if invoice.tax_amount is not None else 0.0
-    expected = invoice.subtotal + tax
-    if _close(expected, invoice.total):
-        return []
+    direct = invoice.subtotal + tax
+    if _close(direct, invoice.total):
+        return [], "direct"
+
+    has_adjustments = bool(invoice.adjustments) or invoice.taxable_base is not None
+    if not has_adjustments:
+        return [
+            ValidationIssue(
+                code=IssueCode.TOTAL_MISMATCH,
+                field="total",
+                message=(
+                    f"Subtotal {invoice.subtotal:.2f} plus tax {tax:.2f} is "
+                    f"{direct:.2f}, but total is {invoice.total:.2f}."
+                ),
+            )
+        ], None
+
+    return _check_adjusted_totals(invoice, tax, direct)
+
+
+def _check_adjusted_totals(
+    invoice: Invoice, tax: float, direct: float
+) -> tuple[list[ValidationIssue], TotalsPath | None]:
+    """Reconcile totals through document-level adjustments.
+
+    Only called once the direct path has already failed and the invoice has
+    something to adjust with.
+    """
+    assert invoice.subtotal is not None and invoice.total is not None
+
+    adjustments_total = _round(
+        sum(item.amount for item in invoice.adjustments if item.amount is not None)
+    )
+    derived_base = _round(invoice.subtotal + adjustments_total)
+    base = invoice.taxable_base if invoice.taxable_base is not None else derived_base
+
+    failures: list[str] = []
+
+    # The stated taxable base, when printed, must be what the adjustments reach.
+    if invoice.taxable_base is not None and not _close(derived_base, base):
+        failures.append(
+            f"subtotal {invoice.subtotal:.2f} plus adjustments "
+            f"{adjustments_total:.2f} is {derived_base:.2f}, but the stated "
+            f"taxable base is {base:.2f}"
+        )
+
+    # The tax must be the rate applied to that base, when a rate is stated.
+    if invoice.tax_rate is not None:
+        expected_tax = _round(base * invoice.tax_rate / 100.0)
+        if not _close(expected_tax, tax):
+            failures.append(
+                f"{invoice.tax_rate:.2f}% of the taxable base {base:.2f} is "
+                f"{expected_tax:.2f}, but tax is {tax:.2f}"
+            )
+
+    # And base plus tax must reach the printed total.
+    adjusted = _round(base + tax)
+    if not _close(adjusted, invoice.total):
+        failures.append(
+            f"taxable base {base:.2f} plus tax {tax:.2f} is {adjusted:.2f}, "
+            f"but total is {invoice.total:.2f}"
+        )
+
+    if not failures:
+        return [], "adjusted"
 
     return [
         ValidationIssue(
             code=IssueCode.TOTAL_MISMATCH,
             field="total",
             message=(
-                f"Subtotal {invoice.subtotal:.2f} plus tax {tax:.2f} is "
-                f"{expected:.2f}, but total is {invoice.total:.2f}."
+                f"Totals do not reconcile. Direct: subtotal "
+                f"{invoice.subtotal:.2f} plus tax {tax:.2f} is {direct:.2f}, "
+                f"but total is {invoice.total:.2f}. With adjustments: "
+                + "; ".join(failures)
+                + "."
             ),
         )
-    ]
+    ], None
 
 
 def _check_tax_rate(invoice: Invoice) -> list[ValidationIssue]:
@@ -289,3 +385,8 @@ def _parse_date(raw: str) -> date | None:
 def _close(left: float, right: float, tolerance: float = TOLERANCE) -> bool:
     """Compare two amounts within `tolerance`, inclusive."""
     return abs(left - right) <= tolerance + 1e-9
+
+
+def _round(value: float) -> float:
+    """Round to cents, so intermediate sums don't drift into the tolerance."""
+    return round(value + 0.0, 2)

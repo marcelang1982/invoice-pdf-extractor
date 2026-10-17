@@ -31,7 +31,9 @@
         "amount": 20.72
       }
     ],
+    "adjustments": [],
     "subtotal": 15043.14,
+    "taxable_base": null,
     "tax_rate": 21.0,
     "tax_amount": 3159.06,
     "total": 18202.2

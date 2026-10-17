@@ -32,6 +32,41 @@ class IssueCode(StrEnum):
     EXTRACTION_FAILED = "EXTRACTION_FAILED"
 
 
+class AdjustmentKind(StrEnum):
+    """What a document-level adjustment represents."""
+
+    DISCOUNT = "discount"
+    SHIPPING = "shipping"
+    OTHER = "other"
+
+
+class Adjustment(BaseModel):
+    """A charge or credit applied to the invoice as a whole, not to one line.
+
+    These appear in the totals block (`Discount -100.00`, `Shipping 50.00`)
+    rather than as rows in the items table, which is what distinguishes them
+    from a `LineItem`. Without this, an invoice that discounts the whole order
+    cannot be represented: its subtotal plus tax would never equal its total.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    description: str | None = Field(
+        default=None, description="Label as printed, e.g. 'Volume discount (10%)'."
+    )
+    amount: float | None = Field(
+        default=None,
+        description=(
+            "Signed amount in the invoice currency. Negative for a discount or "
+            "credit, positive for a charge such as shipping."
+        ),
+    )
+    kind: AdjustmentKind = Field(
+        default=AdjustmentKind.OTHER,
+        description="Category of adjustment: discount, shipping, or other.",
+    )
+
+
 class LineItem(BaseModel):
     """A single billed line on an invoice."""
 
@@ -84,8 +119,24 @@ class Invoice(BaseModel):
     line_items: list[LineItem] = Field(
         default_factory=list, description="Every billed line on the invoice."
     )
+    adjustments: list[Adjustment] = Field(
+        default_factory=list,
+        description=(
+            "Charges or credits applied to the whole invoice from the totals "
+            "block, such as an order-level discount or a shipping charge. A row "
+            "inside the line items table is a line item, not an adjustment."
+        ),
+    )
     subtotal: float | None = Field(
         default=None, description="Sum of all line amounts, before tax."
+    )
+    taxable_base: float | None = Field(
+        default=None,
+        description=(
+            "The amount tax is calculated on, only when the document states it "
+            "explicitly, e.g. 'Importe Neto Gravado' or 'Taxable amount'. Leave "
+            "null if the document does not print it; do not compute it."
+        ),
     )
     tax_rate: float | None = Field(
         default=None,
@@ -107,16 +158,34 @@ class ValidationIssue(BaseModel):
     message: str
 
 
+#: How the totals check was satisfied. `direct` means subtotal + tax == total;
+#: `adjusted` means it only closed once document-level adjustments were applied;
+#: `None` means it could not be checked or did not close at all.
+TotalsPath = Literal["direct", "adjusted"]
+
+
 class ValidationResult(BaseModel):
     """Outcome of validating a single invoice."""
 
     status: ValidationStatus
     issues: list[ValidationIssue] = Field(default_factory=list)
+    totals_path: TotalsPath | None = Field(
+        default=None,
+        description="Which reconciliation closed the totals, if either did.",
+    )
 
     @classmethod
-    def from_issues(cls, issues: list[ValidationIssue]) -> ValidationResult:
+    def from_issues(
+        cls,
+        issues: list[ValidationIssue],
+        totals_path: TotalsPath | None = None,
+    ) -> ValidationResult:
         """Build a result, deriving `status` from whether any issue was found."""
-        return cls(status="needs_review" if issues else "valid", issues=issues)
+        return cls(
+            status="needs_review" if issues else "valid",
+            issues=issues,
+            totals_path=totals_path,
+        )
 
 
 class TokenUsage(BaseModel):
@@ -158,6 +227,7 @@ class FileResult(BaseModel):
     file: str
     status: ValidationStatus
     issues: list[ValidationIssue] = Field(default_factory=list)
+    totals_path: TotalsPath | None = None
     invoice: Invoice | None = None
     usage: TokenUsage = Field(default_factory=TokenUsage)
     attempts: int = 0

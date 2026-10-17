@@ -18,13 +18,13 @@ wild:
                   and comma decimal separators.
 
 Three carry a deliberate defect, declared in ground truth exactly as in the
-clean set. One (hard_09) is a *known limitation probe*: the document is
-arithmetically correct, but our schema has no field for a document-level
-discount, so the validator is expected to flag it. Its ground truth declares no
-expected issue on purpose - hiding that behind an "expected" finding would
-flatter the system instead of measuring it.
+clean set. hard_09 carries a document-level discount and shipping charge in its
+totals block: the invoice is arithmetically correct but only reconciles once
+those adjustments are applied, so it exercises the adjusted totals path rather
+than the direct one.
 
     python scripts/generate_hard_samples.py [--out-dir samples/hard] [--seed N]
+    python scripts/generate_hard_samples.py --skip-pdfs   # ground truth only
 """
 
 from __future__ import annotations
@@ -49,7 +49,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from generate_samples import Customer, Vendor  # noqa: E402
-from invoice_extractor.models import Invoice, IssueCode, LineItem  # noqa: E402
+from invoice_extractor.models import (  # noqa: E402
+    Adjustment,
+    AdjustmentKind,
+    Invoice,
+    IssueCode,
+    LineItem,
+)
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 
@@ -538,9 +544,9 @@ def build_samples() -> list[HardSample]:
         )
     )
 
-    # Discount and shipping live in the *totals block*, which our schema has no
-    # field for. The document is arithmetically correct; the validator is
-    # expected to flag it anyway. Ground truth declares no issue on purpose.
+    # Discount and shipping live in the *totals block*, so they are document-level
+    # adjustments rather than line items. Tax is charged on
+    # subtotal + adjustments, which only reconciles through the adjusted path.
     messy_lines = items(
         [
             ("Managed Kubernetes cluster, monthly", 2.0, 1180.00),
@@ -562,13 +568,13 @@ def build_samples() -> list[HardSample]:
             vendor=HELVETIA,
             customer=SUR,
             notes=(
-                "Known limitation probe, not a document defect. The invoice is "
-                "arithmetically correct: tax is charged on subtotal + discount + "
-                "shipping. The Invoice schema has no field for a document-level "
-                "discount or shipping charge, so subtotal + tax_amount != total "
-                "and TOTAL_MISMATCH is expected to fire. Declared with no "
-                "expected issue so the limitation shows up as a false positive "
-                "rather than being scored as a success."
+                "Document-level discount and shipping, printed in the totals "
+                "block rather than as line item rows. The invoice is "
+                "arithmetically correct: tax is charged on subtotal + discount "
+                "+ shipping, not on the subtotal. It reconciles only through "
+                "the adjusted totals path, so no issue is expected. The "
+                "document does not print a taxable base under its own label, so "
+                "taxable_base stays null and the validator derives it."
             ),
             invoice=assemble(
                 HELVETIA,
@@ -579,32 +585,51 @@ def build_samples() -> list[HardSample]:
                 subtotal=messy_subtotal,
                 tax_amount=messy_tax,
                 total=_round(messy_base + messy_tax),
+            ).model_copy(
+                update={
+                    "adjustments": [
+                        Adjustment(
+                            description="Volume discount (10%)",
+                            amount=messy_discount,
+                            kind=AdjustmentKind.DISCOUNT,
+                        ),
+                        Adjustment(
+                            description="Shipping and handling",
+                            amount=messy_shipping,
+                            kind=AdjustmentKind.SHIPPING,
+                        ),
+                    ]
+                }
             ),
         )
     )
 
     # --- 10-11: Argentine Factura A --------------------------------------- #
 
+    # Factura A prints "Importe Neto Gravado" under its own label, so
+    # taxable_base is transcribed rather than derived. With no adjustments it
+    # equals the subtotal, which is exactly what the document states.
+    pampa = assemble(
+        PAMPA,
+        "0003-00014827",
+        "2026-03-11",
+        "2026-04-10",
+        items(
+            [
+                ("Impresion offset folleteria A4, 4/4 color", 5000.0, 48.75),
+                ("Disenio y armado de original", 1.0, 86500.00),
+                ("Laminado mate sobre tapa", 2000.0, 22.40),
+                ("Flete y distribucion AMBA", 1.0, 54800.00),
+            ]
+        ),
+    )
     samples.append(
         HardSample(
             index=10,
             kind="factura_a",
             vendor=PAMPA,
             customer=PLATA,
-            invoice=assemble(
-                PAMPA,
-                "0003-00014827",
-                "2026-03-11",
-                "2026-04-10",
-                items(
-                    [
-                        ("Impresion offset folleteria A4, 4/4 color", 5000.0, 48.75),
-                        ("Disenio y armado de original", 1.0, 86500.00),
-                        ("Laminado mate sobre tapa", 2000.0, 22.40),
-                        ("Flete y distribucion AMBA", 1.0, 54800.00),
-                    ]
-                ),
-            ),
+            invoice=pampa.model_copy(update={"taxable_base": pampa.subtotal}),
         )
     )
 
@@ -628,7 +653,9 @@ def build_samples() -> list[HardSample]:
             vendor=ANDES,
             customer=SUR,
             defect="due_before_issue",
-            invoice=argentine_broken,
+            invoice=argentine_broken.model_copy(
+                update={"taxable_base": argentine_broken.subtotal}
+            ),
             expected_issues=[
                 issue(IssueCode.DUE_DATE_BEFORE_ISSUE_DATE, "due_date")
             ],
@@ -896,7 +923,6 @@ def render_messy(c: canvas.Canvas, sample: HardSample) -> None:
     """
     inv, vendor = sample.invoice, sample.vendor
     left, right = 20 * mm, PAGE_WIDTH - 20 * mm
-    in_table = sample.index == 8  # hard_08 keeps discount/shipping as line items
 
     c.setFont("Helvetica-Bold", 9)
     c.drawString(left, PAGE_HEIGHT - 22 * mm, "AMOUNT DUE")
@@ -908,10 +934,12 @@ def render_messy(c: canvas.Canvas, sample: HardSample) -> None:
     c.setFont("Helvetica", 9)
     box_y = PAGE_HEIGHT - 22 * mm
     rows: list[tuple[str, str]] = [("Subtotal", money(inv.subtotal, inv.currency))]
-    if not in_table:
-        discount = _round(-(inv.subtotal or 0.0) * 0.10)
-        rows.append(("Volume discount (10%)", money(discount, inv.currency)))
-        rows.append(("Shipping and handling", money(120.00, inv.currency)))
+    # Adjustments are printed here, in the totals block, which is precisely what
+    # makes them adjustments rather than line items.
+    for adjustment in inv.adjustments:
+        rows.append(
+            (adjustment.description or "", money(adjustment.amount, inv.currency))
+        )
     rows.append((f"IVA {qty(inv.tax_rate)}%", money(inv.tax_amount, inv.currency)))
     rows.append(("TOTAL", money(inv.total, inv.currency)))
 
@@ -1049,7 +1077,7 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     label_x, value_x = right - 78 * mm, right - 3 * mm
     c.setFont("Helvetica", 8.5)
     c.drawString(label_x, y, "Importe Neto Gravado:")
-    c.drawRightString(value_x, y, ars(inv.subtotal))
+    c.drawRightString(value_x, y, ars(inv.taxable_base))
     y -= 6 * mm
     c.drawString(label_x, y, f"IVA {qty(inv.tax_rate)}%:")
     c.drawRightString(value_x, y, ars(inv.tax_amount))
@@ -1196,6 +1224,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--seed", type=int, default=20260417, help="Seed for the scanner speckle."
     )
+    parser.add_argument(
+        "--skip-pdfs",
+        action="store_true",
+        help=(
+            "Rewrite ground truth without re-rendering the PDFs. Renders embed "
+            "a creation timestamp, so re-rendering churns every file even when "
+            "nothing about the invoice changed."
+        ),
+    )
     args = parser.parse_args(argv)
 
     pdf_dir = args.out_dir / "pdfs"
@@ -1207,13 +1244,17 @@ def main(argv: list[str] | None = None) -> int:
     samples = build_samples()
 
     for sample in samples:
-        path = render_sample(sample, pdf_dir, rng)
+        path = (
+            pdf_dir / sample.file
+            if args.skip_pdfs
+            else render_sample(sample, pdf_dir, rng)
+        )
         write_ground_truth(sample, truth_dir)
         marks = []
         if sample.defect:
             marks.append(f"defect={sample.defect}")
-        if sample.notes:
-            marks.append("known-limitation probe")
+        if sample.invoice.adjustments:
+            marks.append(f"{len(sample.invoice.adjustments)} adjustments")
         suffix = f"  <- {', '.join(marks)}" if marks else ""
         print(
             f"{sample.file}  {sample.kind:<10} {sample.invoice.currency}  "
@@ -1223,11 +1264,12 @@ def main(argv: list[str] | None = None) -> int:
 
     defects = sum(1 for s in samples if s.defect)
     flagged = sum(1 for s in samples if s.expected_issues)
+    adjusted = sum(1 for s in samples if s.invoice.adjustments)
     print(
-        f"\n{len(samples)} PDFs in {pdf_dir}\n"
+        f"\n{'PDFs left untouched' if args.skip_pdfs else f'{len(samples)} PDFs in {pdf_dir}'}\n"
         f"{len(samples)} ground truth files in {truth_dir}\n"
         f"{defects} deliberate defects ({flagged} files flagged), "
-        f"{sum(1 for s in samples if s.notes)} known-limitation probe"
+        f"{adjusted} with document-level adjustments"
     )
     return 0
 

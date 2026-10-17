@@ -31,7 +31,22 @@ SYSTEM_PROMPT = (
     "Never recompute, correct, or reconcile arithmetic. If the printed total "
     "does not match the subtotal plus tax, report the printed total. If a field "
     "is absent from the document, leave it null rather than inferring it. "
-    "Downstream checks depend on seeing the document's own errors."
+    "Downstream checks depend on seeing the document's own errors.\n"
+    "\n"
+    "Line items versus adjustments. Where a charge is printed decides where it "
+    "goes:\n"
+    "- A row inside the line items table is a line item, even when it is a "
+    "discount, a shipping charge or a surcharge. Keep it in line_items with "
+    "its printed sign.\n"
+    "- A discount, shipping charge or surcharge printed in the totals block, "
+    "alongside the subtotal and tax, is an adjustment. Put it in adjustments "
+    "with its sign: negative for a credit, positive for a charge. Never "
+    "duplicate it into line_items.\n"
+    "\n"
+    "subtotal is the line items total as printed. Only set taxable_base when "
+    "the document states the amount tax is computed on under its own label, "
+    "such as 'Importe Neto Gravado', 'Taxable amount', 'Net amount subject to "
+    "tax' or 'Base imponible'. Leave it null otherwise; never derive it."
 )
 
 USER_PROMPT = (

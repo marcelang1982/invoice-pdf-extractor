@@ -43,10 +43,23 @@
         "amount": 540.0
       }
     ],
+    "adjustments": [
+      {
+        "description": "Volume discount (10%)",
+        "amount": -398.25,
+        "kind": "discount"
+      },
+      {
+        "description": "Shipping and handling",
+        "amount": 120.0,
+        "kind": "shipping"
+      }
+    ],
     "subtotal": 3982.5,
+    "taxable_base": null,
     "tax_rate": 21.0,
     "tax_amount": 777.89,
     "total": 4482.14
   },
-  "notes": "Known limitation probe, not a document defect. The invoice is arithmetically correct: tax is charged on subtotal + discount + shipping. The Invoice schema has no field for a document-level discount or shipping charge, so subtotal + tax_amount != total and TOTAL_MISMATCH is expected to fire. Declared with no expected issue so the limitation shows up as a false positive rather than being scored as a success."
+  "notes": "Document-level discount and shipping, printed in the totals block rather than as line item rows. The invoice is arithmetically correct: tax is charged on subtotal + discount + shipping, not on the subtotal. It reconciles only through the adjusted totals path, so no issue is expected. The document does not print a taxable base under its own label, so taxable_base stays null and the validator derives it."
 }

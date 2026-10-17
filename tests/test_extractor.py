@@ -9,6 +9,7 @@ import pytest
 from conftest import FakeClient, text_only_response, timeout_error, tool_use_response
 from invoice_extractor.config import ConfigError, Settings
 from invoice_extractor.extractor import TOOL_NAME, InvoiceExtractor, find_pdfs
+from invoice_extractor.models import Invoice
 
 
 @pytest.fixture
@@ -72,7 +73,9 @@ def test_tool_schema_comes_from_the_pydantic_model(settings, pdf_file, invoice_d
 
     schema = client.messages.calls[0]["tools"][0]["input_schema"]
     assert schema["type"] == "object"
-    assert set(schema["properties"]) == set(invoice_data)
+    # Compared against the model, not the fixture: adding a field to Invoice
+    # must reach the API schema without anyone remembering to update a test.
+    assert set(schema["properties"]) == set(Invoice.model_fields)
 
 
 def test_configured_model_and_max_tokens_are_used(pdf_file, invoice_data):

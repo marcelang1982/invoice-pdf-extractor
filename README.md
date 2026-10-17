@@ -90,7 +90,7 @@ All pure Python, in `validator.py`. Any finding flips a file's status from
 | `NO_LINE_ITEMS` | The invoice has no billed lines |
 | `LINE_ITEM_AMOUNT_MISMATCH` | A line's `amount` != `quantity x unit_price` |
 | `LINE_ITEMS_SUM_MISMATCH` | Line amounts don't sum to `subtotal` |
-| `TOTAL_MISMATCH` | `subtotal + tax_amount` != `total` |
+| `TOTAL_MISMATCH` | Totals don't reconcile on either path (see below) |
 | `TAX_RATE_OUT_OF_RANGE` | `tax_rate` outside 0–30% |
 | `INVALID_DATE_FORMAT` | A date isn't parseable as ISO 8601 |
 | `DUE_DATE_BEFORE_ISSUE_DATE` | Payment due before the invoice was issued |
@@ -104,6 +104,28 @@ skipped, so `subtotal == total` is still enforced on untaxed invoices.
 **Duplicates flag every member of the group**, not just the later ones. From a
 batch's point of view there is no principled "original", and a human reviewing
 the flag needs to see all the candidates.
+
+### Reconciling totals: two paths
+
+Not every invoice charges tax on its subtotal. An order-level discount or a
+shipping charge printed in the totals block changes the base tax is computed on,
+so a perfectly correct invoice fails `subtotal + tax_amount == total`. The
+validator therefore tries two reconciliations, in order, and records which one
+closed in `totals_path`:
+
+| Path | Check |
+| --- | --- |
+| `direct` | `subtotal + tax_amount == total` |
+| `adjusted` | `subtotal + sum(adjustments) == taxable_base` (derived when the document doesn't print one), **and** `taxable_base × tax_rate == tax_amount`, **and** `taxable_base + tax_amount == total` |
+
+The adjusted path is only attempted when the invoice actually carries
+adjustments or states a taxable base — an empty adjustment list can never excuse
+a broken total. All three of its checks must pass; if any fails, the finding is
+still `TOTAL_MISMATCH`, and the message reports what both paths tried.
+
+Where a charge is *printed* decides how it is modelled: a row inside the items
+table is a `LineItem`, a line in the totals block is an `Adjustment`. `hard_08`
+and `hard_09` are the same economics printed both ways, and both must reconcile.
 
 ---
 
@@ -178,12 +200,13 @@ Three carry a deliberate defect: a scanned invoice whose total doesn't add up
 (02), a multipage invoice with no tax ID on either page (05), and a Factura A
 whose payment due date precedes its issue date (11).
 
-**`hard_09` is a known-limitation probe, not a defect.** Its discount and
-shipping sit in the totals block rather than the items table, so the document is
-arithmetically correct but `subtotal + tax_amount != total` under our schema.
-Its ground truth declares **no** expected issue on purpose: the resulting
-`TOTAL_MISMATCH` should surface as a false positive, because that is what it is.
-Declaring it "expected" would score a schema gap as a success.
+**`hard_09` carries document-level adjustments, not a defect.** Its discount
+and shipping sit in the totals block rather than the items table, so tax is
+charged on `subtotal + adjustments` and the invoice only reconciles through the
+adjusted totals path. Its ground truth declares no expected issue, because the
+document is correct. It began life as a known-limitation probe — the schema had
+nowhere to put those lines, so a correct invoice was flagged — and the
+`Adjustment` model exists because of it.
 
 #### Ground truth discipline
 
@@ -297,18 +320,13 @@ boundary with a known cost.
 
 **Multiple tax rates on one invoice.** `Invoice` carries a single `tax_rate` /
 `tax_amount` pair, so an invoice that charges 21% on some lines and 10.5% on
-others cannot be represented. This is common on Argentine Factura A, and on EU
+others cannot be represented. This is common on Argentine Factura A and on EU
 invoices mixing standard and reduced rates. Fixing it means moving tax onto the
-line item and adding a tax-summary breakdown — a schema change that ripples into
-the validator, the ground truth format, and the persistence layer in Phase 2, so
-it is scheduled rather than patched. The hard set deliberately uses a **single
-21% IVA** to stay inside the current schema.
-
-**Document-level discounts and shipping.** Same root cause: there is no field
-for a charge or credit that sits outside the line items. When they appear in the
-totals block rather than the items table, `subtotal + tax_amount != total` and
-`TOTAL_MISMATCH` fires on a perfectly correct invoice. `hard_09` exists to keep
-this measurable rather than forgotten.
+line item and adding a tax-summary breakdown, which ripples into the validator,
+the ground truth format, and every consumer of the schema. **Not scheduled** —
+it sits on the roadmap until there is a concrete requirement to size it against.
+The hard set deliberately uses a **single 21% IVA** to stay inside the current
+schema.
 
 **Single currency per invoice**, taken as printed. No FX conversion, and no
 handling of invoices that quote two currencies side by side.
@@ -321,9 +339,10 @@ rounding-adjustment line.
 | Phase | Scope |
 | --- | --- |
 | **1** | Extraction + validation engine (this repo) |
-| 2 | Persistence and query layer. Carries the schema change for **multiple tax rates** and document-level discounts, since both need a migration anyway |
+| 2 | Persistence and query layer |
 | 3 | Web interface for review and correction |
 | 4 | Workflow automation and integrations |
+| — | **Multiple tax rates per invoice** (unscheduled; see Known limitations) |
 
 ## Testing
 

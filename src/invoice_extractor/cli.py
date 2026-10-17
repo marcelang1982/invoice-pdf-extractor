@@ -149,6 +149,14 @@ def print_summary(batch: BatchResult, stream=None) -> None:
             file=stream,
         )
 
+    adjusted = [r for r in batch.results if r.totals_path == "adjusted"]
+    if adjusted:
+        print(
+            "\nTotals reconciled through document-level adjustments: "
+            + ", ".join(r.file for r in adjusted),
+            file=stream,
+        )
+
     flagged = [r for r in batch.results if r.issues]
     if flagged:
         print("\nDetails:", file=stream)
