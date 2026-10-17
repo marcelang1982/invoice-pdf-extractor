@@ -617,7 +617,12 @@ def build_samples() -> list[HardSample]:
         items(
             [
                 ("Impresion offset folleteria A4, 4/4 color", 5000.0, 48.75),
-                ("Disenio y armado de original", 1.0, 86500.00),
+                # Real "ñ", not an ASCII transliteration. "Disenio" is not a
+                # Spanish word, so the model kept normalizing it to "Diseño"
+                # and the corpus manufactured a failure no real document would
+                # produce. Reportlab's standard fonts use WinAnsiEncoding,
+                # which covers the accented Latin-1 range.
+                ("Diseño y armado de original", 1.0, 86500.00),
                 ("Laminado mate sobre tapa", 2000.0, 22.40),
                 ("Flete y distribucion AMBA", 1.0, 54800.00),
             ]
@@ -1176,9 +1181,15 @@ RENDERERS = {
 }
 
 
-def render_sample(sample: HardSample, pdf_dir: Path, rng: random.Random) -> Path:
-    """Render one hard sample to its final PDF."""
+def render_sample(sample: HardSample, pdf_dir: Path, seed: int) -> Path:
+    """Render one hard sample to its final PDF.
+
+    The speckle RNG is seeded per sample rather than shared, so rendering
+    one invoice in isolation produces exactly the same bytes as rendering
+    the whole set. Without that, `--only` would silently alter the noise.
+    """
     destination = pdf_dir / sample.file
+    rng = random.Random(seed + sample.index)
 
     if sample.kind == "scanned":
         staging = pdf_dir / f".{sample.file}.source"
@@ -1225,6 +1236,15 @@ def main(argv: list[str] | None = None) -> int:
         "--seed", type=int, default=20260417, help="Seed for the scanner speckle."
     )
     parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="STEM",
+        help=(
+            "Regenerate only these samples, e.g. --only hard_10. Keeps a "
+            "one-invoice fix from churning every other PDF."
+        ),
+    )
+    parser.add_argument(
         "--skip-pdfs",
         action="store_true",
         help=(
@@ -1240,14 +1260,20 @@ def main(argv: list[str] | None = None) -> int:
     pdf_dir.mkdir(parents=True, exist_ok=True)
     truth_dir.mkdir(parents=True, exist_ok=True)
 
-    rng = random.Random(args.seed)
     samples = build_samples()
+
+    if args.only:
+        wanted = {stem.removesuffix(".pdf") for stem in args.only}
+        unknown = wanted - {Path(s.file).stem for s in samples}
+        if unknown:
+            parser.error(f"unknown sample(s): {', '.join(sorted(unknown))}")
+        samples = [s for s in samples if Path(s.file).stem in wanted]
 
     for sample in samples:
         path = (
             pdf_dir / sample.file
             if args.skip_pdfs
-            else render_sample(sample, pdf_dir, rng)
+            else render_sample(sample, pdf_dir, args.seed)
         )
         write_ground_truth(sample, truth_dir)
         marks = []

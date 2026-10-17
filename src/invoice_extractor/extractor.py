@@ -26,7 +26,10 @@ TOOL_NAME = "record_invoice"
 
 SYSTEM_PROMPT = (
     "You extract structured data from invoice PDFs. Transcribe every value "
-    "exactly as printed on the document.\n"
+    "exactly as printed on the document, including spelling and accents: "
+    "report what the page says, not what it should have said. The single "
+    "exception is the invoice number rule below, which is explicit about when "
+    "to join two printed fields.\n"
     "\n"
     "Never recompute, correct, or reconcile arithmetic. If the printed total "
     "does not match the subtotal plus tax, report the printed total. If a field "
@@ -46,7 +49,18 @@ SYSTEM_PROMPT = (
     "subtotal is the line items total as printed. Only set taxable_base when "
     "the document states the amount tax is computed on under its own label, "
     "such as 'Importe Neto Gravado', 'Taxable amount', 'Net amount subject to "
-    "tax' or 'Base imponible'. Leave it null otherwise; never derive it."
+    "tax' or 'Base imponible'. Leave it null otherwise; never derive it.\n"
+    "\n"
+    "Invoice number, one documented exception to transcribing verbatim. Some "
+    "invoices split the number across two labelled fields instead of printing "
+    "it as one string, most commonly Argentine comprobantes with 'Punto de "
+    "Venta' and 'Comp. Nro'. When that happens, join them with a hyphen as "
+    "<punto de venta>-<comprobante>, keeping every leading zero exactly as "
+    "printed in each field: 'Punto de Venta: 0007' with 'Comp. Nro: 00002391' "
+    "becomes '0007-00002391', and a five-digit point of sale such as '00012' "
+    "becomes '00012-00002391'. Do not pad, trim or renumber either part. When "
+    "the document already prints a single invoice number, transcribe it "
+    "verbatim and join nothing."
 )
 
 USER_PROMPT = (

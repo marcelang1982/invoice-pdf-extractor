@@ -32,6 +32,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from invoice_extractor import InvoiceExtractor, process_directory  # noqa: E402
+from invoice_extractor.config import ConfigError  # noqa: E402
 from invoice_extractor.models import BatchResult  # noqa: E402
 
 #: Known sample sets: name -> (default results file, ground truth directory).
@@ -413,6 +415,232 @@ def print_cost(report: Report) -> None:
     print(f"{'EXTRACTIONS RETRIED':<20} {retried:>9}")
 
 
+# --------------------------------------------------------------------------- #
+# Multi-run stability
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class Unstable:
+    """One field instance the extractor did not reproduce across runs."""
+
+    file: str
+    path: str
+    values: list[Any]
+
+
+@dataclass
+class MultiRunReport:
+    """Accuracy and reproducibility measured over several extraction runs."""
+
+    runs: int
+    per_run: list[Report] = field(default_factory=list)
+    stability: dict[str, FieldScore] = field(default_factory=dict)
+    overall_stability: FieldScore = field(default_factory=FieldScore)
+    unstable: list[Unstable] = field(default_factory=list)
+
+    def mean(self, getter) -> float:
+        return sum(getter(r) for r in self.per_run) / len(self.per_run)
+
+    def worst(self, getter) -> float:
+        return min(getter(r) for r in self.per_run)
+
+
+def collect_values(
+    batch: BatchResult, truth_by_file: dict[str, dict]
+) -> dict[tuple[str, str], tuple[str, Any]]:
+    """Record every scored value in a run, keyed by (file, field path).
+
+    The ground truth supplies the index, so the key set is identical across
+    runs even when a run extracts a different number of rows.
+    """
+    extracted = {r.file: r.invoice for r in batch.results}
+    values: dict[tuple[str, str], tuple[str, Any]] = {}
+
+    for file, truth in truth_by_file.items():
+        if file not in extracted:
+            continue
+        actual = extracted[file].model_dump() if extracted[file] else {}
+        expected = truth["invoice"]
+
+        for name in SCALAR_FIELDS:
+            values[(file, name)] = (name, _normalize(name, actual.get(name)))
+
+        for key, fields in (("line_items", LINE_FIELDS), ("adjustments", ADJUSTMENT_FIELDS)):
+            actual_rows = actual.get(key) or []
+            values[(file, f"{key} (count)")] = (
+                f"{key} (count)",
+                len(actual_rows),
+            )
+            for index in range(len(expected.get(key) or [])):
+                row = actual_rows[index] if index < len(actual_rows) else {}
+                for name in fields:
+                    values[(file, f"{key}[{index}].{name}")] = (
+                        name,
+                        _normalize(name, row.get(name)),
+                    )
+
+    return values
+
+
+def measure_stability(
+    runs: list[dict[tuple[str, str], tuple[str, Any]]],
+) -> tuple[dict[str, FieldScore], FieldScore, list[Unstable]]:
+    """Score how often every run produced the same value for the same field."""
+    per_field: dict[str, FieldScore] = {}
+    overall = FieldScore()
+    unstable: list[Unstable] = []
+
+    for key in runs[0]:
+        field_name = runs[0][key][0]
+        observed = [run.get(key, (field_name, None))[1] for run in runs]
+        score = per_field.setdefault(field_name, FieldScore())
+
+        score.total += 1
+        overall.total += 1
+        if all(value == observed[0] for value in observed):
+            score.correct += 1
+            overall.correct += 1
+        else:
+            unstable.append(Unstable(file=key[0], path=key[1], values=observed))
+
+    return per_field, overall, unstable
+
+
+def _normalize(name: str, value: Any) -> Any:
+    """Normalize a value the same way scoring does, for like-for-like compares."""
+    if value is None:
+        return None
+    if name in NUMERIC_FIELDS:
+        try:
+            return round(float(value), 2)
+        except (TypeError, ValueError):
+            return value
+    text = _normalize_text(value)
+    return _ID_SEPARATORS.sub("", text) if name == "vendor_tax_id" else text
+
+
+def run_batches(pdf_dir: Path, runs: int) -> list[BatchResult]:
+    """Extract the whole set `runs` times, reusing one extractor."""
+    extractor = InvoiceExtractor()
+    extractor.settings.require_api_key()
+
+    batches: list[BatchResult] = []
+    for index in range(1, runs + 1):
+        print(f"run {index}/{runs} ...", file=sys.stderr, flush=True)
+        batches.append(process_directory(pdf_dir, extractor=extractor))
+    return batches
+
+
+def print_multi_report(multi: MultiRunReport, *, set_name: str) -> None:
+    """Print mean / worst accuracy plus reproducibility across runs."""
+    runs = multi.runs
+    print("=" * 66)
+    print(f"SET: {set_name}   ({runs} runs)")
+    print("=" * 66)
+    print(f"FIELD ACCURACY AND STABILITY ACROSS {runs} RUNS")
+    print("=" * 66)
+    print(f"{'FIELD':<28} {'MEAN':>9} {'WORST':>9} {'STABILITY':>12}")
+    print("-" * 66)
+
+    def row(label: str, score_of, field_name: str) -> None:
+        """One row: mean and worst accuracy across runs, plus stability."""
+        scores = [score_of(report) for report in multi.per_run]
+        exercised = any(score.total for score in scores)
+        mean_text = (
+            f"{sum(s.accuracy for s in scores) / len(scores):.1%}" if exercised else "n/a"
+        )
+        worst_text = f"{min(s.accuracy for s in scores):.1%}" if exercised else "n/a"
+
+        stability = multi.stability.get(field_name)
+        stable_text = (
+            f"{stability.accuracy:.1%}" if stability and stability.total else "n/a"
+        )
+        print(f"{label:<28} {mean_text:>9} {worst_text:>9} {stable_text:>12}")
+
+    for name in SCALAR_FIELDS:
+        row(name, lambda r, n=name: r.scalar[n], name)
+    row("line_items (count)", lambda r: r.line_count, "line_items (count)")
+    for name in LINE_FIELDS:
+        row(f"line_items[].{name}", lambda r, n=name: r.line_fields[n], name)
+    row("adjustments (count)", lambda r: r.adjustment_count, "adjustments (count)")
+    for name in ADJUSTMENT_FIELDS:
+        row(f"adjustments[].{name}", lambda r, n=name: r.adjustment_fields[n], name)
+
+    print("-" * 66)
+    print(
+        f"{'OVERALL':<28} {multi.mean(lambda r: r.field_accuracy):>8.1%} "
+        f"{multi.worst(lambda r: r.field_accuracy):>9.1%} "
+        f"{multi.overall_stability.accuracy:>11.1%}"
+    )
+
+    print()
+    print("=" * 66)
+    print("DEFECT DETECTION")
+    print("=" * 66)
+    first = multi.per_run[0]
+    print(
+        f"Expected issues detected: mean "
+        f"{multi.mean(lambda r: r.detected_issues):.1f}/{first.expected_issues}, "
+        f"worst run {int(multi.worst(lambda r: r.detected_issues))}/"
+        f"{first.expected_issues}"
+    )
+    print(
+        f"Status agreement:         mean "
+        f"{multi.mean(lambda r: r.status_correct):.1f}/{first.status_total}, "
+        f"worst run {int(multi.worst(lambda r: r.status_correct))}/{first.status_total}"
+    )
+    print(
+        f"Unexpected findings:      mean "
+        f"{multi.mean(lambda r: len(r.unexpected)):.1f}, worst run "
+        f"{int(max(len(r.unexpected) for r in multi.per_run))}"
+    )
+
+    print()
+    print("=" * 66)
+    print("UNSTABLE FIELDS")
+    print("=" * 66)
+    if not multi.unstable:
+        print(f"None. Every field reproduced identically across all {runs} runs.")
+    else:
+        print(
+            f"{len(multi.unstable)} field instance(s) disagreed across runs. "
+            "A single-run score on these is luck, not measurement.\n"
+        )
+        for item in multi.unstable:
+            print(f"  {item.file}  {item.path}")
+            for index, value in enumerate(item.values, start=1):
+                print(f"      run {index}: {value!r}")
+
+    print()
+    print("=" * 66)
+    print("TOKEN COST")
+    print("=" * 66)
+    totals = [
+        sum(t.total_tokens for t in report.tokens) for report in multi.per_run
+    ]
+    inputs = [sum(t.input_tokens for t in report.tokens) for report in multi.per_run]
+    outputs = [sum(t.output_tokens for t in report.tokens) for report in multi.per_run]
+    files = len(multi.per_run[0].tokens)
+    print(f"{'PER RUN':<22} {'INPUT':>10} {'OUTPUT':>9} {'TOTAL':>10}")
+    print("-" * 66)
+    for index, (i, o, t) in enumerate(zip(inputs, outputs, totals), start=1):
+        print(f"{'run ' + str(index):<22} {i:>10,} {o:>9,} {t:>10,}")
+    print("-" * 66)
+    print(f"{'ALL RUNS':<22} {sum(inputs):>10,} {sum(outputs):>9,} {sum(totals):>10,}")
+    print(
+        f"{'MEAN PER INVOICE':<22} {sum(inputs) // (files * runs):>10,} "
+        f"{sum(outputs) // (files * runs):>9,} "
+        f"{sum(totals) // (files * runs):>10,}"
+    )
+    retried = sum(1 for r in multi.per_run for t in r.tokens if t.attempts > 1)
+    print(f"{'EXTRACTIONS RETRIED':<22} {retried:>10}")
+
+    print()
+    print("=" * 66)
+    print(f"{files} files scored, {runs} runs")
+
+
 def _print_score(label: str, score: FieldScore) -> None:
     # A field the corpus never exercises has no accuracy, which is different
     # from an accuracy of zero.
@@ -461,16 +689,61 @@ def main(argv: list[str] | None = None) -> int:
         help="Override the ground truth directory for the chosen set.",
     )
     parser.add_argument(
+        "--runs",
+        type=int,
+        default=1,
+        metavar="N",
+        help=(
+            "Extract the set N times and report mean, worst and stability per "
+            "field. N=1 (default) scores the existing results file instead. "
+            "N>1 calls the API N times and costs N times as much."
+        ),
+    )
+    parser.add_argument(
         "--show-errors",
         action="store_true",
         help="Print every field mismatch with expected and actual values.",
     )
     args = parser.parse_args(argv)
 
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+
     default_results, default_truth = SETS[args.set_name]
     results_path = args.results or root / default_results
     truth_dir = args.ground_truth or root / default_truth
     pdf_dir = truth_dir.parent / "pdfs"
+
+    try:
+        truths = load_ground_truth(truth_dir)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.runs > 1:
+        try:
+            batches = run_batches(pdf_dir, args.runs)
+        except (ConfigError, NotADirectoryError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
+        multi = MultiRunReport(
+            runs=args.runs,
+            per_run=[evaluate(batch, truths) for batch in batches],
+        )
+        if multi.per_run[0].files_scored == 0:
+            print(
+                f"error: nothing in {pdf_dir} matched the {args.set_name} corpus.",
+                file=sys.stderr,
+            )
+            return 2
+
+        values = [collect_values(batch, truths) for batch in batches]
+        multi.stability, multi.overall_stability, multi.unstable = measure_stability(
+            values
+        )
+        print_multi_report(multi, set_name=args.set_name)
+        return 0
 
     if not results_path.is_file():
         print(
@@ -478,12 +751,6 @@ def main(argv: list[str] | None = None) -> int:
             f"  python -m invoice_extractor extract {pdf_dir} --out {results_path}",
             file=sys.stderr,
         )
-        return 2
-
-    try:
-        truths = load_ground_truth(truth_dir)
-    except FileNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
         return 2
 
     batch = BatchResult.model_validate_json(results_path.read_text(encoding="utf-8"))
