@@ -39,8 +39,10 @@ Measured over **3 full runs of each set**, because a single run can get an ambig
 | Exceptions correctly caught | **6 / 6** | **3 / 3** |
 | False alarms | **0** | **0** |
 | Avg. tokens per invoice | 5,598 | 5,964 |
-| Avg. cost per invoice | `[COST_PER_INVOICE]` | `[COST_PER_INVOICE]` |
+| Avg. cost per invoice | **≈ $0.0008** | **≈ $0.0009** |
 | Full report | [clean_runs3.txt](reports/clean_runs3.txt) | [hard_runs3.txt](reports/hard_runs3.txt) |
+
+**≈ $0.0008–0.0009 per invoice (under $1 per 1,000 invoices)** at Claude Haiku 5.5 list prices, Oct 2026.
 
 Accuracy is counted field by field — 560 individual comparisons per run on the clean set, 393 on the hard set — not per document, so one bad line item cannot hide behind a correct header.
 

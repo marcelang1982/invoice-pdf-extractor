@@ -3,13 +3,6 @@ Model   : claude-haiku-5-5
 Date    : 2026-10-17
 Corpus  : samples/pdfs (20 invoices)
 
-NOTE: captured before commit 55e2eea, which scoped the stability keys. The
-clean corpus has no document-level adjustments, so the three adjustments[]
-rows below should read n/a in the STABILITY column; two of them show 100.0%
-because the bare key pooled them with line_items. Accuracy was computed on a
-separate path and is unaffected. Re-running reproduces this file with those
-two cells corrected.
-
 ==================================================================
 SET: clean   (3 runs)
 ==================================================================
@@ -34,8 +27,8 @@ line_items[].quantity           100.0%    100.0%       100.0%
 line_items[].unit_price         100.0%    100.0%       100.0%
 line_items[].amount             100.0%    100.0%       100.0%
 adjustments (count)             100.0%    100.0%       100.0%
-adjustments[].description          n/a       n/a       100.0%   <- see NOTE
-adjustments[].amount               n/a       n/a       100.0%   <- see NOTE
+adjustments[].description          n/a       n/a          n/a
+adjustments[].amount               n/a       n/a          n/a
 adjustments[].kind                 n/a       n/a          n/a
 ------------------------------------------------------------------
 OVERALL                        100.0%    100.0%      100.0%
@@ -57,8 +50,8 @@ TOKEN COST
 ==================================================================
 PER RUN                     INPUT    OUTPUT      TOTAL
 ------------------------------------------------------------------
-run 1                     101,623    10,363    111,986
-run 2                     101,623    10,338    111,961
+run 1                     101,623    10,338    111,961
+run 2                     101,623    10,363    111,986
 run 3                     101,623    10,363    111,986
 ------------------------------------------------------------------
 ALL RUNS                  304,869    31,064    335,933
