@@ -475,8 +475,12 @@ def collect_values(
             for index in range(len(expected.get(key) or [])):
                 row = actual_rows[index] if index < len(actual_rows) else {}
                 for name in fields:
+                    # Scoped, not bare: "description" and "amount" exist in both
+                    # LINE_FIELDS and ADJUSTMENT_FIELDS, and a bare key pools
+                    # them, so an adjustments row would report line-item
+                    # stability.
                     values[(file, f"{key}[{index}].{name}")] = (
-                        name,
+                        f"{key}[].{name}",
                         _normalize(name, row.get(name)),
                     )
 
@@ -559,8 +563,12 @@ def print_multi_report(multi: MultiRunReport, *, set_name: str) -> None:
     print(f"{'FIELD':<28} {'MEAN':>9} {'WORST':>9} {'STABILITY':>12}")
     print("-" * 66)
 
-    def row(label: str, score_of, field_name: str) -> None:
-        """One row: mean and worst accuracy across runs, plus stability."""
+    def row(label: str, score_of) -> None:
+        """One row: mean and worst accuracy across runs, plus stability.
+
+        The printed label doubles as the stability key, so the two can never
+        disagree about which field a number belongs to.
+        """
         scores = [score_of(report) for report in multi.per_run]
         exercised = any(score.total for score in scores)
         mean_text = (
@@ -568,20 +576,20 @@ def print_multi_report(multi: MultiRunReport, *, set_name: str) -> None:
         )
         worst_text = f"{min(s.accuracy for s in scores):.1%}" if exercised else "n/a"
 
-        stability = multi.stability.get(field_name)
+        stability = multi.stability.get(label)
         stable_text = (
             f"{stability.accuracy:.1%}" if stability and stability.total else "n/a"
         )
         print(f"{label:<28} {mean_text:>9} {worst_text:>9} {stable_text:>12}")
 
     for name in SCALAR_FIELDS:
-        row(name, lambda r, n=name: r.scalar[n], name)
-    row("line_items (count)", lambda r: r.line_count, "line_items (count)")
+        row(name, lambda r, n=name: r.scalar[n])
+    row("line_items (count)", lambda r: r.line_count)
     for name in LINE_FIELDS:
-        row(f"line_items[].{name}", lambda r, n=name: r.line_fields[n], name)
-    row("adjustments (count)", lambda r: r.adjustment_count, "adjustments (count)")
+        row(f"line_items[].{name}", lambda r, n=name: r.line_fields[n])
+    row("adjustments (count)", lambda r: r.adjustment_count)
     for name in ADJUSTMENT_FIELDS:
-        row(f"adjustments[].{name}", lambda r, n=name: r.adjustment_fields[n], name)
+        row(f"adjustments[].{name}", lambda r, n=name: r.adjustment_fields[n])
 
     print("-" * 66)
     print(

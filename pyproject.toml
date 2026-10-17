@@ -28,5 +28,5 @@ packages = ["src/invoice_extractor"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 addopts = "-q"
