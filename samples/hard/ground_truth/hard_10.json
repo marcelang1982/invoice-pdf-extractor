@@ -5,7 +5,7 @@
   "expected_status": "valid",
   "expected_issues": [],
   "invoice": {
-    "vendor_name": "Talleres Graficos Pampa S.R.L.",
+    "vendor_name": "Talleres Gr\u00e1ficos Pampa S.R.L.",
     "vendor_tax_id": "30-71234567-8",
     "invoice_number": "0003-00014827",
     "issue_date": "2026-03-11",
@@ -13,7 +13,7 @@
     "currency": "ARS",
     "line_items": [
       {
-        "description": "Impresion offset folleteria A4, 4/4 color",
+        "description": "Impresi\u00f3n offset folleter\u00eda A4, 4/4 color",
         "quantity": 5000.0,
         "unit_price": 48.75,
         "amount": 243750.0
@@ -31,7 +31,7 @@
         "amount": 44800.0
       },
       {
-        "description": "Flete y distribucion AMBA",
+        "description": "Flete y distribuci\u00f3n AMBA",
         "quantity": 1.0,
         "unit_price": 54800.0,
         "amount": 54800.0

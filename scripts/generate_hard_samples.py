@@ -123,9 +123,9 @@ CASCADE = Vendor(
 )
 
 PAMPA = Vendor(
-    name="Talleres Graficos Pampa S.R.L.",
+    name="Talleres Gráficos Pampa S.R.L.",
     street="Av. Rivadavia 4582, Piso 3",
-    city="C1205AAB - Ciudad Autonoma de Buenos Aires",
+    city="C1205AAB - Ciudad Autónoma de Buenos Aires",
     tax_id="30-71234567-8",
     currency="ARS",
     email="facturacion@graficospampa.example",
@@ -136,7 +136,7 @@ PAMPA = Vendor(
 ANDES = Vendor(
     name="Distribuidora Andes S.A.",
     street="Ruta Provincial 82 Km 4,5",
-    city="M5509 - Lujan de Cuyo, Mendoza",
+    city="M5509 - Luján de Cuyo, Mendoza",
     tax_id="30-69874521-3",
     currency="ARS",
     email="cobranzas@distandes.example",
@@ -162,7 +162,7 @@ PLATA = Customer(
     "Consultora del Plata S.A.", "Reconquista 657, Piso 8", "C1003ABM - CABA"
 )
 SUR = Customer(
-    "Cooperativa Agricola del Sur Ltda.", "Belgrano 1240", "B6000 - Junin, Bs. As."
+    "Cooperativa Agrícola del Sur Ltda.", "Belgrano 1240", "B6000 - Junín, Bs. As."
 )
 
 
@@ -616,7 +616,7 @@ def build_samples() -> list[HardSample]:
         "2026-04-10",
         items(
             [
-                ("Impresion offset folleteria A4, 4/4 color", 5000.0, 48.75),
+                ("Impresión offset folletería A4, 4/4 color", 5000.0, 48.75),
                 # Real "ñ", not an ASCII transliteration. "Disenio" is not a
                 # Spanish word, so the model kept normalizing it to "Diseño"
                 # and the corpus manufactured a failure no real document would
@@ -624,7 +624,7 @@ def build_samples() -> list[HardSample]:
                 # which covers the accented Latin-1 range.
                 ("Diseño y armado de original", 1.0, 86500.00),
                 ("Laminado mate sobre tapa", 2000.0, 22.40),
-                ("Flete y distribucion AMBA", 1.0, 54800.00),
+                ("Flete y distribución AMBA", 1.0, 54800.00),
             ]
         ),
     )
@@ -1022,7 +1022,7 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     c.drawString(left + 5 * mm, top - 15 * mm, f"Domicilio: {vendor.street}")
     c.drawString(left + 5 * mm, top - 19.5 * mm, vendor.city)
     c.drawString(
-        left + 5 * mm, top - 24 * mm, "Condicion frente al IVA: Responsable Inscripto"
+        left + 5 * mm, top - 24 * mm, "Condición frente al IVA: Responsable Inscripto"
     )
     c.drawString(left + 5 * mm, top - 28.5 * mm, "Ingresos Brutos: Convenio Multilateral")
 
@@ -1032,7 +1032,7 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     punto, numero = (inv.invoice_number or "0000-00000000").split("-")
     c.drawString(mid + 8 * mm, top - 15 * mm, f"Punto de Venta: {punto}")
     c.drawString(mid + 48 * mm, top - 15 * mm, f"Comp. Nro: {numero}")
-    c.drawString(mid + 8 * mm, top - 20 * mm, f"Fecha de Emision: {dmy(inv.issue_date)}")
+    c.drawString(mid + 8 * mm, top - 20 * mm, f"Fecha de Emisión: {dmy(inv.issue_date)}")
     if inv.vendor_tax_id:
         c.drawString(mid + 8 * mm, top - 25 * mm, f"CUIT: {inv.vendor_tax_id}")
     c.drawString(mid + 8 * mm, top - 30 * mm, "Inicio de Actividades: 01/08/2014")
@@ -1041,11 +1041,11 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     c.setLineWidth(0.6)
     c.rect(left, y - 20 * mm, right - left, 20 * mm)
     c.setFont("Helvetica", 7.5)
-    c.drawString(left + 4 * mm, y - 5 * mm, f"Senor/es: {sample.customer.name}")
+    c.drawString(left + 4 * mm, y - 5 * mm, f"Señor/es: {sample.customer.name}")
     c.drawString(left + 4 * mm, y - 10 * mm, f"Domicilio: {sample.customer.street}, {sample.customer.city}")
-    c.drawString(left + 4 * mm, y - 15 * mm, "Condicion frente al IVA: Responsable Inscripto")
+    c.drawString(left + 4 * mm, y - 15 * mm, "Condición frente al IVA: Responsable Inscripto")
     c.drawString(mid + 30 * mm, y - 5 * mm, "CUIT: 33-55512349-9")
-    c.drawString(mid + 30 * mm, y - 10 * mm, "Condicion de venta: Cuenta Corriente 30 dias")
+    c.drawString(mid + 30 * mm, y - 10 * mm, "Condición de venta: Cuenta Corriente 30 días")
     c.drawString(mid + 30 * mm, y - 15 * mm, f"Moneda: {inv.currency}")
 
     y -= 28 * mm
@@ -1059,7 +1059,7 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 7.5)
     header_y = y - 4.3 * mm
-    c.drawString(code_x, header_y, "Codigo")
+    c.drawString(code_x, header_y, "Código")
     c.drawString(desc_x, header_y, "Producto / Servicio")
     c.drawRightString(qty_x, header_y, "Cantidad")
     c.drawRightString(price_x, header_y, "Precio Unit.")
