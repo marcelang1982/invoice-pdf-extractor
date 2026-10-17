@@ -111,7 +111,7 @@ If neither closes, the invoice is flagged, and the message explains what both pa
 
 Invoice PDFs are sent to the Anthropic API for the extraction step. Everything after that — validation, scoring, results and any storage you add — runs on your own infrastructure.
 
-Anthropic's data handling and retention terms are theirs to state, not mine: review them directly before processing confidential documents, and talk to me if your invoices cannot leave your own network.
+If your invoices contain sensitive data, review Anthropic's commercial data terms before sending real documents. If they cannot leave your network at all, tell me and we'll look at the options.
 
 ---
 
@@ -174,7 +174,9 @@ Run the test suite — 131 tests, none of which call the API — with `pytest`.
 
 This is a working engine rather than a finished product, and adapting it is the point. The usual work is supporting the specific formats your suppliers actually send, exporting straight into your accounting system or ERP, and reading invoices automatically from your inbox instead of by hand.
 
-Contact me on Upwork: [UPWORK_PROFILE_URL]
+Contact me on Upwork: https://www.upwork.com/freelancers/~01037b3ffff940717b
+
+Send me a few sample invoices and the system you need the data in, and I'll reply with how I'd adapt it.
 
 ---
 
