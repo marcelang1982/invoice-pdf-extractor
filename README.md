@@ -371,4 +371,6 @@ suite runs instantly.
 
 ## License
 
-MIT. All sample data is fictitious.
+All rights reserved. This repository is a portfolio demo; the code is shared for review only.
+
+All sample data is fictitious.

@@ -8,7 +8,6 @@ version = "0.1.0"
 description = "Extract structured, validated data from invoice PDFs using Claude"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
 dependencies = [
     "anthropic>=0.40",
     "pydantic>=2.6",
