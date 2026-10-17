@@ -1,0 +1,62 @@
+Command : python scripts/evaluate.py --set hard --runs 3
+Model   : claude-haiku-5-5
+Date    : 2026-10-17
+Corpus  : samples/hard/pdfs (11 invoices), ground truth committed before this run
+
+==================================================================
+SET: hard   (3 runs)
+==================================================================
+FIELD ACCURACY AND STABILITY ACROSS 3 RUNS
+==================================================================
+FIELD                             MEAN     WORST    STABILITY
+------------------------------------------------------------------
+vendor_name                     100.0%    100.0%       100.0%
+vendor_tax_id                   100.0%    100.0%       100.0%
+invoice_number                  100.0%    100.0%       100.0%
+issue_date                      100.0%    100.0%       100.0%
+due_date                        100.0%    100.0%       100.0%
+currency                        100.0%    100.0%       100.0%
+subtotal                        100.0%    100.0%       100.0%
+taxable_base                    100.0%    100.0%       100.0%
+tax_rate                        100.0%    100.0%       100.0%
+tax_amount                      100.0%    100.0%       100.0%
+total                           100.0%    100.0%       100.0%
+line_items (count)              100.0%    100.0%       100.0%
+line_items[].description        100.0%    100.0%       100.0%
+line_items[].quantity           100.0%    100.0%       100.0%
+line_items[].unit_price         100.0%    100.0%       100.0%
+line_items[].amount             100.0%    100.0%       100.0%
+adjustments (count)             100.0%    100.0%       100.0%
+adjustments[].description       100.0%    100.0%       100.0%
+adjustments[].amount            100.0%    100.0%       100.0%
+adjustments[].kind              100.0%    100.0%       100.0%
+------------------------------------------------------------------
+OVERALL                        100.0%    100.0%      100.0%
+
+==================================================================
+DEFECT DETECTION
+==================================================================
+Expected issues detected: mean 3.0/3, worst run 3/3
+Status agreement:         mean 11.0/11, worst run 11/11
+Unexpected findings:      mean 0.0, worst run 0
+
+==================================================================
+UNSTABLE FIELDS
+==================================================================
+None. Every field reproduced identically across all 3 runs.
+
+==================================================================
+TOKEN COST
+==================================================================
+PER RUN                     INPUT    OUTPUT      TOTAL
+------------------------------------------------------------------
+run 1                      58,715     6,912     65,627
+run 2                      58,715     6,912     65,627
+run 3                      58,715     6,843     65,558
+------------------------------------------------------------------
+ALL RUNS                  176,145    20,667    196,812
+MEAN PER INVOICE            5,337       626      5,964
+EXTRACTIONS RETRIED             0
+
+==================================================================
+11 files scored, 3 runs

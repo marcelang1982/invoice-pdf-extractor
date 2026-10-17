@@ -1,375 +1,162 @@
 # Invoice PDF Extractor
 
-Turns invoice PDFs into structured, validated data. Claude reads the document;
-plain Python decides whether the result is trustworthy.
+**Invoice PDFs from email → clean, validated data, with every exception flagged for review.**
 
-The split is the point. A language model is good at reading a page and bad at
-being a calculator you can audit. So extraction is a single constrained API call
-per PDF, and every correctness check — arithmetic, required fields, date
-coherence, duplicate detection — runs deterministically afterwards, with no
-tokens involved and no run-to-run variance.
+<!--
+  DEMO PLACEHOLDER — replace this block with a GIF or screenshot.
+  Suggested recording: run `python -m invoice_extractor extract samples/hard/pdfs`
+  and capture the terminal as the summary table fills in, showing a few invoices
+  marked `valid` and the flagged ones with their issue codes.
+  Save as docs/demo.gif and uncomment the line below.
+-->
+<!-- ![Demo](docs/demo.gif) -->
 
-**Phase 1 of 4: the extraction and validation engine.** Designed as a reusable
-package; later phases (persistence, web UI, workflow automation) import it
-rather than reimplement it.
+> `docs/demo.gif` — *demo recording goes here*
 
 ---
 
-## Quick start
+## What it does
+
+- **Reads any invoice PDF**, including scans with no text layer, invoices that run onto a second page, and layouts it has never seen before.
+- **Returns structured data**: vendor, tax ID, invoice number, dates, currency, every line item, subtotal, tax and total.
+- **Checks the arithmetic independently.** Line items are re-added, tax is recomputed, totals are reconciled. This runs in plain Python, not in the AI model, so the same invoice always produces the same verdict.
+- **Flags exceptions instead of guessing.** A total that doesn't add up, a missing tax ID, a due date before the issue date, or the same invoice submitted twice — each is reported with a specific code and a plain-language explanation.
+- **Reports what it cost.** Tokens and processing time are recorded per invoice, so the running cost is measured rather than estimated.
+
+Nothing is silently corrected. If the document is wrong, the output says the document is wrong.
+
+---
+
+## Results
+
+Measured over **3 full runs of each set**, because a single run can get an ambiguous field right by luck. "Worst" is the weakest of the three runs; "stability" is how often all three runs returned an identical value.
+
+| | Clean set (20 invoices) | Hard set (11 invoices) |
+| --- | --- | --- |
+| Field accuracy — mean | **100.0%** | **100.0%** |
+| Field accuracy — worst run | **100.0%** | **100.0%** |
+| Stability across runs | **100.0%** | **100.0%** |
+| Exceptions correctly caught | **6 / 6** | **3 / 3** |
+| False alarms | **0** | **0** |
+| Avg. tokens per invoice | 5,598 | 5,964 |
+| Avg. cost per invoice | `[COST_PER_INVOICE]` | `[COST_PER_INVOICE]` |
+| Full report | [clean_runs3.txt](reports/clean_runs3.txt) | [hard_runs3.txt](reports/hard_runs3.txt) |
+
+Accuracy is counted field by field — 560 individual comparisons per run on the clean set, 393 on the hard set — not per document, so one bad line item cannot hide behind a correct header.
+
+The reports are the raw output of the scoring script, committed so the numbers can be checked rather than taken on trust.
+
+---
+
+## What the hard set covers
+
+The clean set is what invoices look like in a demo: generated digitally, neatly typeset, one page. A perfect score there proves very little. The hard set is what actually arrives in an inbox:
+
+| | What it tests |
+| --- | --- |
+| **Scanned documents** | Rasterized, slightly out of focus, rotated a degree or two, speckled and JPEG-compressed, with **no text layer at all** — the content has to be read visually, like a photo |
+| **Multi-page invoices** | The item table continues onto page 2, with totals only at the very end |
+| **Wrapped descriptions** | Long item descriptions split across two lines inside the same table cell |
+| **Disordered layouts** | Totals printed at the top of the page, item tables with no borders |
+| **Discounts and shipping** | Order-level charges that change what the tax is actually calculated on |
+| **Argentine Factura A** | Spanish labels, CUIT, `dd/mm/yyyy` dates, `1.234,56` comma decimals, and invoice numbers split across two fields (`Punto de Venta` + `Comp. Nro`) that have to be recomposed as `0007-00002391` |
+
+Three of these invoices carry a deliberate error, so the checks are measured on documents where something really is wrong.
+
+---
+
+## How validation works
+
+Extraction uses an AI model. **Validation does not.** Every check below is ordinary Python: no model call, no variability, no per-check cost.
+
+| Check | What it catches |
+| --- | --- |
+| Required fields | A missing vendor, tax ID, invoice number, date, currency or total |
+| Line item maths | A line whose amount isn't quantity × unit price |
+| Subtotal | Line items that don't add up to the stated subtotal |
+| Totals | Subtotal and tax that don't reach the stated total |
+| Tax rate | A rate outside a plausible 0–30% |
+| Dates | A payment due date that precedes the issue date |
+| Duplicates | The same vendor and invoice number appearing twice in one batch |
+
+### Totals are reconciled two ways
+
+Not every invoice charges tax on its subtotal. When an order-level discount or shipping charge is printed in the totals block, it changes the base the tax applies to — and a perfectly correct invoice would fail a naive `subtotal + tax = total` check.
+
+So totals are reconciled in two passes:
+
+1. **Direct** — `subtotal + tax = total`. The ordinary case.
+2. **Adjusted** — only attempted when the invoice actually carries discounts, shipping or a stated taxable base. All three must hold: the adjustments reach the taxable base, the tax matches the rate applied to that base, and base plus tax reaches the total.
+
+If neither closes, the invoice is flagged, and the message explains what both passes tried. The output records which pass succeeded, so a reviewer can see *why* an unusual invoice was accepted.
+
+---
+
+## Honest limitations
+
+- **The sample corpus is synthetic.** Every invoice here was generated for testing — no real company, person or tax ID appears anywhere. The "scanned" invoices are controlled degradations of clean renders: blur, rotation, grain and JPEG artefacts applied deliberately. That is harder than a clean PDF and genuinely exercises visual reading, but it is **not** the same as a photo of creased paper under uneven light, or a document that has been through a fax and two photocopiers. **These numbers should be re-measured on your real invoices before being relied on.**
+- **One tax rate per invoice.** An invoice charging 21% on some lines and 10.5% on others cannot currently be represented. This is common on Argentine Factura A and on EU invoices mixing standard and reduced rates.
+- **No handwriting.** Handwritten amounts, annotations and signatures are out of scope.
+- **One currency per invoice**, taken as printed. No exchange-rate conversion.
+- **No withholdings or retentions** (IIBB, Ganancias), and no line-level tax.
+- **Results vary between AI models.** The figures above are for one specific model; a cheaper or more expensive one will shift both accuracy and cost.
+
+---
+
+## Roadmap
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| **1** | Extraction and validation engine | **This repository** |
+| 2 | Database plus a web interface for uploading PDFs and reviewing flagged invoices | Planned |
+| 3 | Automation: n8n reading invoice attachments straight from Gmail | Planned |
+| — | Multiple tax rates on a single invoice | Not scheduled |
+
+---
+
+## Quickstart
 
 ```bash
+# 1. Set up
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-cp .env.example .env          # then add your ANTHROPIC_API_KEY
+# 2. Add your API key
+cp .env.example .env        # then edit .env and fill in ANTHROPIC_API_KEY
 
-python scripts/generate_samples.py                                  # 20 clean sample PDFs
-python -m invoice_extractor extract samples/pdfs --out results.json  # extract + validate
-python scripts/evaluate.py --set clean                              # score against ground truth
+# 3. Generate the sample invoices
+python scripts/generate_samples.py          # 20 clean invoices
+python scripts/generate_hard_samples.py     # 11 hard invoices
+
+# 4. Extract and validate
+python -m invoice_extractor extract samples/pdfs --out results.json
+
+# 5. Score the result against known-correct data
+python scripts/evaluate.py --set clean
 ```
 
-There is a second, deliberately harder corpus (scanned, multipage, Argentine):
+To try the hard set instead:
 
 ```bash
-python scripts/generate_hard_samples.py
 python -m invoice_extractor extract samples/hard/pdfs --out results_hard.json
 python scripts/evaluate.py --set hard --show-errors
 ```
 
-Cheap smoke test before spending tokens on all 20:
+To measure stability the way the results table does, add `--runs 3`. Each run calls the API, so three runs cost three times as much:
 
 ```bash
-python -m invoice_extractor extract samples/pdfs --limit 2 --out /tmp/smoke.json
+python scripts/evaluate.py --set hard --runs 3
 ```
 
----
-
-## How extraction works
-
-Each PDF is sent as a base64 `document` content block, paired with **forced tool
-use**: one tool, `record_invoice`, whose `input_schema` is generated directly
-from the `Invoice` Pydantic model.
-
-```python
-tools = [{"name": "record_invoice", "input_schema": Invoice.model_json_schema()}]
-tool_choice = {"type": "tool", "name": "record_invoice"}
-```
-
-Two consequences worth stating:
-
-- **No JSON scraping.** Claude cannot answer in prose, so there is no
-  markdown-fenced JSON to find and no parser to harden against chatty preambles.
-- **The schema cannot drift from the model.** The contract Claude is held to and
-  the type the response is parsed into are the same object.
-
-Each call records tokens, attempt count, and wall time on the returned
-`ExtractionResult`, so cost per invoice is a measurement rather than an estimate.
-
-### Every field is optional, deliberately
-
-`Invoice` makes all fields nullable. That looks lax, but it is what makes the
-validator meaningful: an invoice missing its vendor tax ID has to come back as
-an invoice with a `None` tax ID, not as a parse failure that aborts the run. The
-model describes *what the document contains*; `validator.py` decides whether
-that is acceptable.
-
-The extraction prompt reinforces this — Claude is told never to recompute or
-reconcile arithmetic. A total that doesn't add up must be transcribed as printed
-so the validator can flag it.
-
----
-
-## Validation rules
-
-All pure Python, in `validator.py`. Any finding flips a file's status from
-`valid` to `needs_review`.
-
-| Code | Rule |
-| --- | --- |
-| `MISSING_REQUIRED_FIELD` | `vendor_name`, `vendor_tax_id`, `invoice_number`, `issue_date`, `currency`, `subtotal`, `total` must all be present |
-| `NO_LINE_ITEMS` | The invoice has no billed lines |
-| `LINE_ITEM_AMOUNT_MISMATCH` | A line's `amount` != `quantity x unit_price` |
-| `LINE_ITEMS_SUM_MISMATCH` | Line amounts don't sum to `subtotal` |
-| `TOTAL_MISMATCH` | Totals don't reconcile on either path (see below) |
-| `TAX_RATE_OUT_OF_RANGE` | `tax_rate` outside 0–30% |
-| `INVALID_DATE_FORMAT` | A date isn't parseable as ISO 8601 |
-| `DUE_DATE_BEFORE_ISSUE_DATE` | Payment due before the invoice was issued |
-| `DUPLICATE_INVOICE` | Another file in the batch shares the same vendor + invoice number |
-| `EXTRACTION_FAILED` | Extraction exhausted its retries for this file |
-
-Money comparisons use a **0.01 tolerance**, since invoices are rounded to cents
-and floats are floats. A missing `tax_amount` is read as zero tax rather than
-skipped, so `subtotal == total` is still enforced on untaxed invoices.
-
-**Duplicates flag every member of the group**, not just the later ones. From a
-batch's point of view there is no principled "original", and a human reviewing
-the flag needs to see all the candidates.
-
-### Reconciling totals: two paths
-
-Not every invoice charges tax on its subtotal. An order-level discount or a
-shipping charge printed in the totals block changes the base tax is computed on,
-so a perfectly correct invoice fails `subtotal + tax_amount == total`. The
-validator therefore tries two reconciliations, in order, and records which one
-closed in `totals_path`:
-
-| Path | Check |
-| --- | --- |
-| `direct` | `subtotal + tax_amount == total` |
-| `adjusted` | `subtotal + sum(adjustments) == taxable_base` (derived when the document doesn't print one), **and** `taxable_base × tax_rate == tax_amount`, **and** `taxable_base + tax_amount == total` |
-
-The adjusted path is only attempted when the invoice actually carries
-adjustments or states a taxable base — an empty adjustment list can never excuse
-a broken total. All three of its checks must pass; if any fails, the finding is
-still `TOTAL_MISMATCH`, and the message reports what both paths tried.
-
-Where a charge is *printed* decides how it is modelled: a row inside the items
-table is a `LineItem`, a line in the totals block is an `Adjustment`. `hard_08`
-and `hard_09` are the same economics printed both ways, and both must reconcile.
-
----
-
-## The sample corpora
-
-Two sets, scored separately and never pooled. All data is fictitious — no real
-company, person, or tax ID appears anywhere.
-
-| Set | Files | What it tests |
-| --- | --- | --- |
-| `clean` | 20 | The happy path: born-digital, well typeset, single page |
-| `hard` | 11 | What actually arrives: scans, multipage, wrapping, messy layouts, Argentine Factura A |
-
-A combined average would hide the only difference worth measuring, so
-`evaluate.py` takes `--set clean` or `--set hard` and reports each on its own.
-
-### The clean set
-
-`scripts/generate_samples.py` produces 20 invoices in `samples/pdfs/`, each
-with a matching ground truth JSON in `samples/ground_truth/`.
-
-The corpus is built to resist shortcuts:
-
-- **Four distinct layouts** — `classic` (serif, fully ruled table), `modern_boxed`
-  (colored header band, zebra striping), `minimal` (no rules at all),
-  `two_column` (vendor/customer side by side).
-- **Six vendors, two currencies** (USD and EUR), **1–8 line items**, and tax
-  rates from 0% to 21%.
-- **A "Bill To" block on every invoice.** The customer is noise the extractor
-  must not mistake for the vendor.
-- **Mixed date formats.** Two layouts print `2026-02-04`, two print
-  `04 Feb 2026`; ground truth is always ISO. The extractor is instructed to
-  normalize, so the corpus tests that it does.
-- **Deterministic.** Seeded RNG, so regenerating gives byte-identical amounts.
-  Quantities stay on half-unit steps and prices on cents, so
-  `round(quantity * unit_price, 2)` is exact — the generator never manufactures
-  rounding findings it didn't intend.
-
-### Deliberate defects
-
-Five invoices carry an injected defect, declared in their ground truth as
-`expected_issues`. The defect is rendered *into the PDF* — the invoice with a
-broken total genuinely shows the wrong number on the page.
-
-| Sample | Defect | Expected finding |
-| --- | --- | --- |
-| 05 | Total doesn't add up (inflated by 40.00) | `TOTAL_MISMATCH` |
-| 09 | Vendor tax ID absent from the document | `MISSING_REQUIRED_FIELD` |
-| 12 | Due date 10 days before issue date | `DUE_DATE_BEFORE_ISSUE_DATE` |
-| 16 | Tax rate of 87.5% (arithmetic kept self-consistent) | `TAX_RATE_OUT_OF_RANGE` |
-| 18 | Sample 03 re-issued under a different layout | `DUPLICATE_INVOICE` |
-
-That is 5 defects across **6 flagged files** — the duplicate implicates both
-sample 18 and sample 03.
-
-### The hard set
-
-A clean-set score says little about real invoices, because the clean set is
-born-digital, perfectly typeset, and single page. `scripts/generate_hard_samples.py`
-produces 11 invoices in `samples/hard/pdfs/` that introduce the conditions that
-actually show up:
-
-| Files | Kind | What it introduces |
-| --- | --- | --- |
-| 01–03 | `scanned` | Rasterized to 150dpi, defocused, rotated 1–2°, speckled, JPEG-compressed, repackaged as an **image-only PDF with no text layer** — extraction has to go through vision |
-| 04–05 | `multipage` | Items table continues onto page 2; totals appear only at the end |
-| 06–07 | `wrapped` | Descriptions long enough to wrap onto a second line inside the cell |
-| 08–09 | `messy` | Totals printed at the *top*, borderless detail table, discount and shipping lines |
-| 10–11 | `factura_a` | Argentine Factura A in Spanish: CUIT, single 21% IVA, `dd/mm/yyyy` dates, `1.234,56` comma decimals, ARS |
-
-Three carry a deliberate defect: a scanned invoice whose total doesn't add up
-(02), a multipage invoice with no tax ID on either page (05), and a Factura A
-whose payment due date precedes its issue date (11).
-
-**`hard_09` carries document-level adjustments, not a defect.** Its discount
-and shipping sit in the totals block rather than the items table, so tax is
-charged on `subtotal + adjustments` and the invoice only reconciles through the
-adjusted totals path. Its ground truth declares no expected issue, because the
-document is correct. It began life as a known-limitation probe — the schema had
-nowhere to put those lines, so a correct invoice was flagged — and the
-`Adjustment` model exists because of it.
-
-#### Ground truth discipline
-
-Ground truth for the hard set was written, audited, and committed **before** the
-extractor was ever pointed at it. Every amount is spelled out in
-`generate_hard_samples.py` rather than sampled, so it can be reviewed by eye.
-
-The rule: **ground truth is not edited to make a case pass.** If a case fails,
-the first question is whether the extractor, the validator, or the ground truth
-is wrong — and if it really is the ground truth, the fix is explained rather
-than quietly applied.
-
----
-
-## CLI
-
-```
-python -m invoice_extractor extract <directory> [options]
-
-  --out PATH      Where to write JSON results (default: results.json)
-  --model NAME    Override the model from .env
-  --limit N       Process at most N files
-  --quiet         Suppress per-file progress
-```
-
-Progress goes to stderr, the summary table to stdout, so the table can be piped
-on its own. Exit code is `1` if any file failed extraction outright, `0`
-otherwise — `needs_review` is a finding, not an error.
-
-```
-FILE             STATUS        TOKENS  ISSUES
---------------------------------------------------------
-invoice_01.pdf   valid           2314  -
-invoice_05.pdf   needs_review    2380  TOTAL_MISMATCH
-...
-```
-
----
-
-## Evaluation
-
-`scripts/evaluate.py` compares a run against its ground truth and reports three
-things:
-
-- **Field accuracy** — per-field correct/total across the corpus, so you can see
-  *which* fields the model gets wrong rather than a single opaque score.
-  Comparison is normalized: whitespace and case for strings, 0.01 tolerance for
-  money, ISO parsing for dates, and separators stripped from tax IDs (so
-  `47-8821093` and `478821093` match).
-- **Defect detection** — recall on the expected issues, plus unexpected findings
-  (flags raised on invoices that should be clean). A validator that flags
-  everything would score 100% recall; the unexpected-findings count is what
-  keeps it honest.
-- **Token cost** — per invoice and per set, so accuracy can be weighed against
-  what it costs to get.
+Point it at your own invoices by passing any folder of PDFs:
 
 ```bash
-python scripts/evaluate.py --set clean
-python scripts/evaluate.py --set hard --show-errors    # per-field diffs
+python -m invoice_extractor extract /path/to/your/invoices --out results.json
 ```
+
+Run the test suite — 131 tests, none of which call the API — with `pytest`.
 
 ---
-
-## Layout
-
-```
-src/invoice_extractor/
-  models.py      Invoice, LineItem, ValidationResult, batch result types
-  extractor.py   PDF -> Invoice via base64 document block + forced tool use
-  validator.py   Deterministic rules + batch duplicate detection
-  pipeline.py    Extract-then-validate over a batch; the engine's entry point
-  cli.py         python -m invoice_extractor extract ...
-  config.py      Settings from .env
-scripts/
-  generate_samples.py   20 sample PDFs + ground truth
-  evaluate.py           Score results against ground truth
-tests/           Validator covered rule by rule; extractor fully mocked
-```
-
-### Using it as a library
-
-```python
-from invoice_extractor import InvoiceExtractor, process_directory, validate_invoice
-
-batch = process_directory("samples/pdfs")
-for result in batch.results:
-    print(result.file, result.status, [i.code for i in result.issues])
-print(batch.totals.total_tokens)
-```
-
----
-
-## Reliability
-
-- **Retries** — 3 attempts with 1s/2s/4s backoff on connection errors, timeouts,
-  rate limits, and 5xx. Also retried: a response that somehow arrives without
-  the tool call, or whose payload fails schema validation, since a second
-  attempt often succeeds. Token usage accumulates across attempts — a failed
-  attempt that reached the API was still billed.
-- **Failures are contained.** `extract_file` never raises for an extraction
-  failure; the error lands on the result object so one unreadable PDF doesn't
-  take down a 500-file batch. Those files come back as `needs_review` with
-  `EXTRACTION_FAILED`.
-- **The SDK's own retry layer is disabled** (`max_retries=0`) so backoff isn't
-  applied twice.
-
-## Known limitations
-
-These are schema or scope gaps, not bugs. Each one is a deliberate Phase 1
-boundary with a known cost.
-
-**Multiple tax rates on one invoice.** `Invoice` carries a single `tax_rate` /
-`tax_amount` pair, so an invoice that charges 21% on some lines and 10.5% on
-others cannot be represented. This is common on Argentine Factura A and on EU
-invoices mixing standard and reduced rates. Fixing it means moving tax onto the
-line item and adding a tax-summary breakdown, which ripples into the validator,
-the ground truth format, and every consumer of the schema. **Not scheduled** —
-it sits on the roadmap until there is a concrete requirement to size it against.
-The hard set deliberately uses a **single 21% IVA** to stay inside the current
-schema.
-
-**Single currency per invoice**, taken as printed. No FX conversion, and no
-handling of invoices that quote two currencies side by side.
-
-**No line-item tax**, no withholding, no retentions (IIBB, Ganancias), no
-rounding-adjustment line.
-
-## Roadmap
-
-| Phase | Scope |
-| --- | --- |
-| **1** | Extraction + validation engine (this repo) |
-| 2 | Persistence and query layer |
-| 3 | Web interface for review and correction |
-| 4 | Workflow automation and integrations |
-| — | **Multiple tax rates per invoice** (unscheduled; see Known limitations) |
-
-## Testing
-
-```bash
-pytest
-```
-
-Tests never touch the network. The extractor is tested against a fake client
-that returns canned `tool_use` responses, which also lets retry behavior and
-token accounting be asserted directly. Backoff sleeps are injected, so the
-suite runs instantly.
-
----
-
-## Configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | — | Required to extract |
-| `MODEL` | `claude-haiku-5-5` | Any PDF-capable Claude model |
-| `MAX_RETRIES` | `3` | Attempts per PDF |
-| `MAX_TOKENS` | `4096` | Output cap; raise for very long invoices |
-
-`.env` is gitignored. Existing environment variables take precedence over
-`.env`, so CI and one-off overrides work without editing the file.
-
-## License
 
 All rights reserved. This repository is a portfolio demo; the code is shared for review only.
 
