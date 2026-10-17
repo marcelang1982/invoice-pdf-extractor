@@ -32,7 +32,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from invoice_extractor import InvoiceExtractor, process_directory  # noqa: E402
+from invoice_extractor import InvoiceExtractor, find_pdfs, process_paths  # noqa: E402
 from invoice_extractor.config import ConfigError  # noqa: E402
 from invoice_extractor.models import BatchResult  # noqa: E402
 
@@ -520,15 +520,31 @@ def _normalize(name: str, value: Any) -> Any:
     return _ID_SEPARATORS.sub("", text) if name == "vendor_tax_id" else text
 
 
-def run_batches(pdf_dir: Path, runs: int) -> list[BatchResult]:
-    """Extract the whole set `runs` times, reusing one extractor."""
+def run_batches(
+    pdf_dir: Path, runs: int, only: list[str] | None = None
+) -> list[BatchResult]:
+    """Extract the set `runs` times, reusing one extractor.
+
+    `only` restricts the run to named files, so a single invoice can be
+    re-measured without paying for the whole corpus.
+    """
     extractor = InvoiceExtractor()
     extractor.settings.require_api_key()
+
+    paths = find_pdfs(pdf_dir)
+    if only:
+        wanted = {name.removesuffix(".pdf") for name in only}
+        paths = [p for p in paths if p.stem in wanted]
+        missing = wanted - {p.stem for p in paths}
+        if missing:
+            raise FileNotFoundError(
+                f"no such PDF in {pdf_dir}: {', '.join(sorted(missing))}"
+            )
 
     batches: list[BatchResult] = []
     for index in range(1, runs + 1):
         print(f"run {index}/{runs} ...", file=sys.stderr, flush=True)
-        batches.append(process_directory(pdf_dir, extractor=extractor))
+        batches.append(process_paths(paths, extractor=extractor))
     return batches
 
 
@@ -700,6 +716,15 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="STEM",
+        help=(
+            "Score only these files, e.g. --only hard_10. With --runs this "
+            "re-measures one invoice without paying for the whole set."
+        ),
+    )
+    parser.add_argument(
         "--show-errors",
         action="store_true",
         help="Print every field mismatch with expected and actual values.",
@@ -720,10 +745,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
+    if args.only:
+        wanted = {name.removesuffix(".pdf") for name in args.only}
+        truths = {f: t for f, t in truths.items() if Path(f).stem in wanted}
+        if not truths:
+            print(
+                f"error: --only matched nothing in the {args.set_name} corpus.",
+                file=sys.stderr,
+            )
+            return 2
+
     if args.runs > 1:
         try:
-            batches = run_batches(pdf_dir, args.runs)
-        except (ConfigError, NotADirectoryError) as exc:
+            batches = run_batches(pdf_dir, args.runs, args.only)
+        except (ConfigError, NotADirectoryError, FileNotFoundError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
