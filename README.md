@@ -2,6 +2,8 @@
 
 **Invoice PDFs from email → clean, validated data, with every exception flagged for review.**
 
+*Built with Python, Pydantic and the Claude API.*
+
 <!--
   DEMO PLACEHOLDER — replace this block with a GIF or screenshot.
   Suggested recording: run `python -m invoice_extractor extract samples/hard/pdfs`
@@ -11,13 +13,11 @@
 -->
 <!-- ![Demo](docs/demo.gif) -->
 
-> `docs/demo.gif` — *demo recording goes here*
-
 ---
 
 ## What it does
 
-- **Reads any invoice PDF**, including scans with no text layer, invoices that run onto a second page, and layouts it has never seen before.
+- **Reads invoice PDFs**, including scans with no text layer, invoices that run onto a second page, and layouts it has never seen before.
 - **Returns structured data**: vendor, tax ID, invoice number, dates, currency, every line item, subtotal, tax and total.
 - **Checks the arithmetic independently.** Line items are re-added, tax is recomputed, totals are reconciled. This runs in plain Python, not in the AI model, so the same invoice always produces the same verdict.
 - **Flags exceptions instead of guessing.** A total that doesn't add up, a missing tax ID, a due date before the issue date, or the same invoice submitted twice — each is reported with a specific code and a plain-language explanation.
@@ -46,6 +46,8 @@ Measured over **3 full runs of each set**, because a single run can get an ambig
 
 Accuracy is counted field by field — 560 individual comparisons per run on the clean set, 393 on the hard set — not per document, so one bad line item cannot hide behind a correct header.
 
+A 100% score on a synthetic corpus shows the pipeline works end to end — extraction, validation and scoring all hold together. It is not a forecast for your documents. Read [Honest limitations](#honest-limitations) before expecting the same numbers on real invoices.
+
 The reports are the raw output of the scoring script, committed so the numbers can be checked rather than taken on trust.
 
 ---
@@ -58,9 +60,9 @@ The clean set is what invoices look like in a demo: generated digitally, neatly 
 | --- | --- |
 | **Scanned documents** | Rasterized, slightly out of focus, rotated a degree or two, speckled and JPEG-compressed, with **no text layer at all** — the content has to be read visually, like a photo |
 | **Multi-page invoices** | The item table continues onto page 2, with totals only at the very end |
-| **Wrapped descriptions** | Long item descriptions split across two lines inside the same table cell |
+| **Wrapped descriptions** | Long item descriptions split across two or three lines inside the same table cell |
 | **Disordered layouts** | Totals printed at the top of the page, item tables with no borders |
-| **Discounts and shipping** | Order-level charges that change what the tax is actually calculated on |
+| **Discounts and shipping** | The same discount and shipping charge printed two ways: as rows in the item table, and in the totals block where they change what the tax is actually calculated on |
 | **Argentine Factura A** | Spanish labels, CUIT, `dd/mm/yyyy` dates, `1.234,56` comma decimals, and invoice numbers split across two fields (`Punto de Venta` + `Comp. Nro`) that have to be recomposed as `0007-00002391` |
 
 Three of these invoices carry a deliberate error, so the checks are measured on documents where something really is wrong.
@@ -102,6 +104,14 @@ If neither closes, the invoice is flagged, and the message explains what both pa
 - **One currency per invoice**, taken as printed. No exchange-rate conversion.
 - **No withholdings or retentions** (IIBB, Ganancias), and no line-level tax.
 - **Results vary between AI models.** The figures above are for one specific model; a cheaper or more expensive one will shift both accuracy and cost.
+
+---
+
+## Data privacy
+
+Invoice PDFs are sent to the Anthropic API for the extraction step. Everything after that — validation, scoring, results and any storage you add — runs on your own infrastructure.
+
+Anthropic's data handling and retention terms are theirs to state, not mine: review them directly before processing confidential documents, and talk to me if your invoices cannot leave your own network.
 
 ---
 
@@ -157,6 +167,14 @@ python -m invoice_extractor extract /path/to/your/invoices --out results.json
 ```
 
 Run the test suite — 131 tests, none of which call the API — with `pytest`.
+
+---
+
+## Need this for your invoices?
+
+This is a working engine rather than a finished product, and adapting it is the point. The usual work is supporting the specific formats your suppliers actually send, exporting straight into your accounting system or ERP, and reading invoices automatically from your inbox instead of by hand.
+
+Contact me on Upwork: [UPWORK_PROFILE_URL]
 
 ---
 
