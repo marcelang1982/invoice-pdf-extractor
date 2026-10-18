@@ -107,6 +107,42 @@ If neither closes, the invoice is flagged, and the message explains what both pa
 
 ---
 
+## Run the web app
+
+Phase 2 adds a database and a browser interface on top of the engine: upload
+PDFs, watch them process, review what was flagged, and export the result.
+
+```bash
+cp .env.example .env        # then edit .env and fill in ANTHROPIC_API_KEY
+docker compose up --build
+```
+
+Then open **http://127.0.0.1:8000**. Click **Load sample invoices** to run the
+31 bundled samples through it, or drop your own PDFs on the upload screen.
+
+If something else already uses port 8000, pick another:
+`APP_PORT=8001 docker compose up --build`.
+
+| Screen | What it does |
+| --- | --- |
+| Upload | Drag and drop several PDFs at once. Each is extracted in the background; the list updates itself as results arrive. |
+| Invoices | Every invoice with its status, review state and findings. Filter by either, and export what you are looking at as CSV. |
+| Detail | The PDF beside the data pulled out of it, with each finding highlighted on the field it concerns. Approve or reject, with an optional note. |
+
+Two verdicts are tracked separately. **Status** is the machine's: `valid`,
+`needs_review` or `failed`. **Review** is yours: `pending`, `approved` or
+`rejected`. Approving a flagged invoice records your decision without pretending
+the arithmetic now adds up, so the next person still sees why it was flagged.
+
+Re-uploading a PDF that is already stored does not re-extract it, so pointing
+the uploader at the same folder twice is safe and costs nothing.
+
+**There is no authentication.** The port is published on `127.0.0.1` only, so
+the app is reachable from your own machine and nowhere else. Putting it on a
+network means putting a login in front of it first.
+
+---
+
 ## Data privacy
 
 Invoice PDFs are sent to the Anthropic API for the extraction step. Everything after that — validation, scoring, results and any storage you add — runs on your own infrastructure.
@@ -119,8 +155,8 @@ If your invoices contain sensitive data, review Anthropic's commercial data term
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| **1** | Extraction and validation engine | **This repository** |
-| 2 | Database plus a web interface for uploading PDFs and reviewing flagged invoices | Planned |
+| **1** | Extraction and validation engine | **Done** |
+| **2** | Database plus a web interface for uploading and reviewing | **Done** |
 | 3 | Automation: n8n reading invoice attachments straight from Gmail | Planned |
 | — | Multiple tax rates on a single invoice | Not scheduled |
 

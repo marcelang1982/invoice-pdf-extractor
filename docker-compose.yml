@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: invoices
+      POSTGRES_PASSWORD: invoices
+      POSTGRES_DB: invoices
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The app waits for this, so migrations never race the database.
+      test: ["CMD-SHELL", "pg_isready -U invoices -d invoices"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    # Supplies ANTHROPIC_API_KEY and MODEL. The environment block below wins
+    # for anything it also sets.
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://invoices:invoices@db:5432/invoices
+      STORAGE_DIR: /data/pdfs
+      SAMPLE_DIRS: /app/samples/pdfs:/app/samples/hard/pdfs
+    ports:
+      # Bound to loopback on purpose: there is no authentication, so the app
+      # must not be reachable from the network. Override the host port with
+      # APP_PORT=8001 if something else already has 8000.
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    volumes:
+      - pdfs:/data/pdfs
+
+volumes:
+  pgdata:
+  pdfs:
