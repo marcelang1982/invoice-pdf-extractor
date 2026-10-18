@@ -234,9 +234,12 @@ def export_csv(
             ]
         )
 
-    buffer.seek(0)
+    # Excel assumes the host's legacy encoding unless a UTF-8 BOM says
+    # otherwise, which turns "Gráficos" into "GrÃ¡ficos". Everything else
+    # ignores the BOM, so it costs nothing to include.
+    body = "\ufeff" + buffer.getvalue()
     return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
+        iter([body]),
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="invoices.csv"'},
     )

@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import anyio.to_thread
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +23,13 @@ logger = logging.getLogger(__name__)
 PACKAGE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = PACKAGE_DIR / "templates"
 STATIC_DIR = PACKAGE_DIR / "static"
+
+#: Threads kept available for serving requests, on top of however many
+#: extractions are queued. A background task waiting on the extraction
+#: semaphore occupies a thread from the same pool the synchronous routes use,
+#: so without headroom a large upload would block the interface that is
+#: supposed to show its progress.
+REQUEST_THREAD_HEADROOM = 64
 
 
 def create_app(
@@ -40,6 +48,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        limiter = anyio.to_thread.current_default_thread_limiter()
+        limiter.total_tokens = max(
+            limiter.total_tokens,
+            app.state.settings.extraction_concurrency + REQUEST_THREAD_HEADROOM,
+        )
         recovered = recover_interrupted(app.state.settings)
         if recovered:
             logger.warning("marked %s interrupted invoice(s) as failed", recovered)

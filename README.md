@@ -81,7 +81,7 @@ Extraction uses an AI model. **Validation does not.** Every check below is ordin
 | Totals | Subtotal and tax that don't reach the stated total |
 | Tax rate | A rate outside a plausible 0–30% |
 | Dates | A payment due date that precedes the issue date |
-| Duplicates | The same vendor and invoice number appearing twice in one batch |
+| Duplicates | The same vendor and invoice number appearing twice in one batch, or matching an invoice already stored. Rejected and failed invoices are not treated as originals, so a resubmission after a rejection passes cleanly |
 
 ### Totals are reconciled two ways
 
@@ -120,8 +120,14 @@ docker compose up --build
 Then open **http://127.0.0.1:8000**. Click **Load sample invoices** to run the
 31 bundled samples through it, or drop your own PDFs on the upload screen.
 
-If something else already uses port 8000, pick another:
-`APP_PORT=8001 docker compose up --build`.
+### Settings
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | — | Required. Read from `.env`. |
+| `MODEL` | `claude-haiku-5-5` | Any PDF-capable Claude model. |
+| `APP_PORT` | `8000` | Host port the app is published on, always bound to `127.0.0.1`. Set it if something else already has 8000: `APP_PORT=8001 docker compose up --build`. |
+| `EXTRACTION_CONCURRENCY` | `4` | How many PDFs are sent to the API at once. Uploading a folder queues the rest, which stay visible as `processing` until a slot frees. Raise it for throughput, lower it to stay inside a rate limit. |
 
 | Screen | What it does |
 | --- | --- |

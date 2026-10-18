@@ -243,7 +243,8 @@ def test_reviewing_a_missing_invoice_is_a_404(client):
 
 
 def read_csv(response) -> list[dict]:
-    return list(csv.DictReader(io.StringIO(response.text)))
+    """Decode as utf-8-sig so the BOM does not end up in the first column name."""
+    return list(csv.DictReader(io.StringIO(response.content.decode("utf-8-sig"))))
 
 
 def test_the_export_has_one_row_per_invoice(client):
@@ -289,7 +290,9 @@ def test_the_export_respects_the_filter(make_client):
 
 
 def test_the_export_has_a_header_even_when_empty(client):
-    rows = client.get("/invoices/export.csv").text.splitlines()
+    # Decoded as utf-8-sig, the way a correct reader handles the BOM.
+    body = client.get("/invoices/export.csv").content.decode("utf-8-sig")
+    rows = body.splitlines()
 
     assert rows[0].startswith("id,filename,status,review_status,review_note")
     assert len(rows) == 1
@@ -303,3 +306,25 @@ def test_multiple_issue_codes_are_space_separated(make_client):
     codes = read_csv(client.get("/invoices/export.csv"))[0]["issue_codes"].split()
 
     assert set(codes) == {"MISSING_REQUIRED_FIELD", "TOTAL_MISMATCH"}
+
+
+def test_the_export_is_utf8_with_a_bom(client):
+    """Without the BOM, Excel reads UTF-8 as its legacy encoding and mangles
+    every accent: "Gráficos" arrives as "GrÃ¡ficos"."""
+    upload(client, ("a.pdf", pdf_bytes("a")))
+
+    raw = client.get("/invoices/export.csv").content
+
+    assert raw.startswith(b"\xef\xbb\xbf")
+    assert "charset=utf-8" in client.get("/invoices/export.csv").headers["content-type"]
+
+
+def test_accented_values_survive_the_round_trip(make_client):
+    accented = invoice(vendor_name="Talleres Gráficos Pampa S.R.L.")
+    client = make_client(FakeExtractor(default=result(extracted=accented)))
+    upload(client, ("a.pdf", pdf_bytes("a")))
+
+    body = client.get("/invoices/export.csv").content.decode("utf-8-sig")
+    row = list(csv.DictReader(io.StringIO(body)))[0]
+
+    assert row["vendor_name"] == "Talleres Gráficos Pampa S.R.L."

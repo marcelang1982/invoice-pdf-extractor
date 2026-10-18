@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://invoices:invoices@localhost:5432/invoices"
 DEFAULT_STORAGE_DIR = Path("/data/pdfs")
+#: How many PDFs may be extracted at once. Uploading a folder should not
+#: fire one API call per file simultaneously.
+DEFAULT_EXTRACTION_CONCURRENCY = 4
 
 
 class WebConfigError(RuntimeError):
@@ -24,6 +27,7 @@ class WebSettings:
     storage_dir: Path = DEFAULT_STORAGE_DIR
     #: Directories scanned by "Load sample invoices", in order.
     sample_dirs: tuple[Path, ...] = ()
+    extraction_concurrency: int = DEFAULT_EXTRACTION_CONCURRENCY
 
     @classmethod
     def from_env(cls, *, load: bool = True) -> WebSettings:
@@ -47,6 +51,9 @@ class WebSettings:
             ),
             storage_dir=Path(os.getenv("STORAGE_DIR") or DEFAULT_STORAGE_DIR),
             sample_dirs=sample_dirs,
+            extraction_concurrency=_int_env(
+                "EXTRACTION_CONCURRENCY", DEFAULT_EXTRACTION_CONCURRENCY
+            ),
         )
 
 
@@ -66,3 +73,15 @@ def _normalize_driver(url: str) -> str:
     if url.startswith("postgresql://"):
         return "postgresql+psycopg://" + url[len("postgresql://") :]
     return url
+
+
+def _int_env(name: str, default: int) -> int:
+    """Read a positive int from the environment, ignoring anything unusable."""
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default

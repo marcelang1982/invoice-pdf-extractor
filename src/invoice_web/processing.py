@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,18 @@ logger = logging.getLogger(__name__)
 #: is enough at this scale: the critical section is a couple of small queries,
 #: while the expensive part (the API call) stays outside it.
 DUPLICATE_LOCK_KEY = 0x1E701CE
+
+
+@lru_cache(maxsize=8)
+def extraction_semaphore(limit: int) -> threading.Semaphore:
+    """The process-wide cap on simultaneous extractions.
+
+    Cached by limit so every worker in the process shares one semaphore.
+    Uploading a folder of fifty PDFs should not open fifty connections to the
+    API at once; the rest queue up and stay visibly `processing` until a slot
+    frees.
+    """
+    return threading.Semaphore(max(1, limit))
 
 
 def process_invoice(
@@ -53,7 +67,10 @@ def process_invoice(
             stored_path = Path(invoice.stored_path)
             filename = invoice.filename
 
-        result = extractor.extract_file(stored_path)
+        # Only the API call is capped. The database work around it is fast
+        # and holding the slot across it would shrink the effective limit.
+        with extraction_semaphore(settings.extraction_concurrency):
+            result = extractor.extract_file(stored_path)
 
         with session_scope(settings) as session:
             # Held until this transaction ends, which is what serializes the
