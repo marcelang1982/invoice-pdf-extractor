@@ -1,0 +1,8 @@
+<div id="counts" class="counts"
+     {% if counts.processing %}hx-get="/fragments/counts" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  <span class="count"><strong>{{ counts.total }}</strong> invoices</span>
+  <span class="count count-review"><strong>{{ counts.needs_review }}</strong> need review</span>
+  {% if counts.processing %}
+    <span class="count count-processing"><strong>{{ counts.processing }}</strong> processing</span>
+  {% endif %}
+</div>

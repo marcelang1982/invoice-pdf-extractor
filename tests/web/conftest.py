@@ -123,3 +123,39 @@ def session(settings: WebSettings) -> Iterator:
     factory = get_sessionmaker(settings.database_url)
     with factory() as database_session:
         yield database_session
+
+
+@pytest.fixture
+def make_client(settings: WebSettings):
+    """Build a TestClient wired to a fake extractor.
+
+    `TestClient` runs BackgroundTasks synchronously once the response is
+    returned, so an upload is fully processed by the time the call comes back.
+    That makes the tests deterministic without any polling or sleeping.
+    """
+    from fastapi.testclient import TestClient
+
+    from invoice_web.main import create_app
+
+    created = []
+
+    def build(extractor=None):
+        from .factories import FakeExtractor
+
+        extractor = extractor or FakeExtractor()
+        app = create_app(settings=settings, extractor_factory=lambda: extractor)
+        client = TestClient(app)
+        created.append(client)
+        client.extractor = extractor
+        return client
+
+    yield build
+
+    for client in created:
+        client.close()
+
+
+@pytest.fixture
+def client(make_client):
+    """A client with a default fake extractor."""
+    return make_client()

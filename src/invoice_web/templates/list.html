@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% set active = 'list' %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h1>Invoices</h1>
+    {% include 'partials/counts.html' %}
+  </div>
+
+  <div class="toolbar">
+    <div class="filters">
+      <a href="/invoices{% if review %}?review={{ review }}{% endif %}"
+         class="chip {{ 'chip-on' if not status }}">All</a>
+      {% for value in status_filters %}
+        <a href="/invoices?status={{ value }}{% if review %}&review={{ review }}{% endif %}"
+           class="chip {{ 'chip-on' if status == value }}">{{ value|replace('_',' ') }}</a>
+      {% endfor %}
+    </div>
+    <div class="filters">
+      {% for value in review_filters %}
+        <a href="/invoices?review={{ value }}{% if status %}&status={{ status }}{% endif %}"
+           class="chip chip-review {{ 'chip-on' if review == value }}">{{ value }}</a>
+      {% endfor %}
+      {% if review %}<a href="/invoices{% if status %}?status={{ status }}{% endif %}" class="chip">clear</a>{% endif %}
+    </div>
+    <a class="button secondary"
+       href="/invoices/export.csv{% if status or review %}?{% if status %}status={{ status }}{% endif %}{% if status and review %}&{% endif %}{% if review %}review={{ review }}{% endif %}{% endif %}">
+      Export CSV
+    </a>
+  </div>
+
+  {% if invoices %}
+  <table class="grid">
+    <thead>
+      <tr>
+        <th>File</th><th>Status</th><th>Review</th><th>Vendor</th>
+        <th>Number</th><th>Issued</th><th class="num">Total</th><th>Issues</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}{% include 'partials/row.html' %}{% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No invoices match this filter. <a href="/">Upload some</a>.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% set active = 'upload' %}
+{% block content %}
+<section class="panel">
+  <h1>Upload invoices</h1>
+  <p class="lead">Drop PDFs below, or choose files. Each one is extracted and validated in the background.</p>
+
+  <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+    <label id="dropzone" for="file-input">
+      <strong>Drop PDFs here</strong>
+      <span>or click to choose files</span>
+      <input id="file-input" name="files" type="file" accept="application/pdf" multiple hidden>
+    </label>
+    <ul id="file-list" class="file-list"></ul>
+    <button id="submit" type="submit" disabled>Upload</button>
+  </form>
+
+  <form action="/samples/load" method="post" class="samples">
+    <button type="submit" class="secondary">Load sample invoices</button>
+    <span class="hint">Loads the 31 bundled samples: 20 clean and 11 deliberately difficult.</span>
+  </form>
+</section>
+
+<script>
+  // Minimal glue: wire a drop zone to a plain file input. No build step.
+  const zone = document.getElementById('dropzone');
+  const input = document.getElementById('file-input');
+  const list = document.getElementById('file-list');
+  const submit = document.getElementById('submit');
+
+  function show() {
+    list.innerHTML = '';
+    for (const file of input.files) {
+      const item = document.createElement('li');
+      item.textContent = file.name;
+      list.appendChild(item);
+    }
+    submit.disabled = input.files.length === 0;
+    submit.textContent = input.files.length
+      ? `Upload ${input.files.length} file${input.files.length > 1 ? 's' : ''}`
+      : 'Upload';
+  }
+
+  input.addEventListener('change', show);
+  ['dragenter', 'dragover'].forEach(name =>
+    zone.addEventListener(name, event => {
+      event.preventDefault();
+      zone.classList.add('dragging');
+    }));
+  ['dragleave', 'drop'].forEach(name =>
+    zone.addEventListener(name, event => {
+      event.preventDefault();
+      zone.classList.remove('dragging');
+    }));
+  zone.addEventListener('drop', event => {
+    input.files = event.dataTransfer.files;
+    show();
+  });
+</script>
+{% endblock %}

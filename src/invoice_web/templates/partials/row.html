@@ -1,0 +1,17 @@
+<tr id="invoice-{{ invoice.id }}"
+    {% if invoice.status == 'processing' %}
+      hx-get="/fragments/invoices/{{ invoice.id }}/row"
+      hx-trigger="every 2s" hx-swap="outerHTML"
+    {% endif %}>
+  <td class="cell-file"><a href="/invoices/{{ invoice.id }}">{{ invoice.filename }}</a></td>
+  <td>{% with status = invoice.status %}{% include 'partials/status_badge.html' %}{% endwith %}</td>
+  <td>{% with status = invoice.review_status %}{% include 'partials/status_badge.html' %}{% endwith %}</td>
+  <td>{{ invoice.vendor_name or '—' }}</td>
+  <td>{{ invoice.invoice_number or '—' }}</td>
+  <td>{{ invoice.issue_date or '—' }}</td>
+  <td class="num">{{ invoice.total | money(invoice.currency) }}</td>
+  <td class="cell-issues">
+    {% for code in invoice.issue_codes %}<span class="code">{{ code }}</span>{% endfor %}
+    {% if invoice.status == 'failed' and invoice.error %}<span class="code code-error">{{ invoice.error }}</span>{% endif %}
+  </td>
+</tr>
