@@ -21,3 +21,6 @@ results*.json
 
 # OS
 .DS_Store
+
+# Web app runtime
+/data/
