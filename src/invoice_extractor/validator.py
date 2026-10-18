@@ -139,7 +139,6 @@ def find_duplicates(
 
     issues: dict[str, ValidationIssue] = {}
     for key, names in groups.items():
-        vendor, number = key
         stored = known.get(key)
         if len(names) < 2 and stored is None:
             continue
@@ -152,12 +151,16 @@ def find_duplicates(
             if stored is not None:
                 clauses.append(f"is already stored as invoice {stored}")
 
+            # Quote the values as the document prints them. The lowercased key
+            # is how they are compared, not how they should be read back to
+            # someone looking at the invoice.
+            printed = invoices[name]
             issues[name] = ValidationIssue(
                 code=IssueCode.DUPLICATE_INVOICE,
                 field="invoice_number",
                 message=(
-                    f"Invoice number {number!r} from vendor {vendor!r} "
-                    f"{' and '.join(clauses)}."
+                    f"Invoice number {printed.invoice_number!r} from vendor "
+                    f"{printed.vendor_name!r} {' and '.join(clauses)}."
                 ),
                 related_id=stored,
             )

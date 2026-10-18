@@ -104,7 +104,7 @@ def test_the_detail_page_shows_the_extracted_data(client):
     assert "Northwind Logistics LLC" in body
     assert "47-8821093" in body
     assert "Freight forwarding" in body
-    assert 'src="/invoices/1/file"' in body
+    assert 'src="/invoices/1/file#pagemode=none' in body
 
 
 def test_a_flagged_field_is_highlighted(make_client):

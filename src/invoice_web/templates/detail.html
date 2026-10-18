@@ -44,7 +44,9 @@
 
   <div class="detail">
     <div class="viewer">
-      <iframe src="/invoices/{{ invoice.id }}/file" title="{{ invoice.filename }}"></iframe>
+      {# pagemode=none hides the thumbnail sidebar; FitH fits the page width #}
+      <iframe src="/invoices/{{ invoice.id }}/file#pagemode=none&view=FitH"
+              title="{{ invoice.filename }}"></iframe>
     </div>
 
     <div>

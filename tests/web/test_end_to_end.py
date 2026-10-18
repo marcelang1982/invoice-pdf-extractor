@@ -60,7 +60,7 @@ def test_upload_process_list_approve_export(make_client, session):
 
     # 5. The detail page shows the PDF, the data and the finding together.
     detail = client.get(f"/invoices/{stored[1].id}").text
-    assert f'src="/invoices/{stored[1].id}/file"' in detail
+    assert f'src="/invoices/{stored[1].id}/file#pagemode=none' in detail
     assert "NL-2026-0002" in detail
     assert "TOTAL_MISMATCH" in detail
     assert client.get(f"/invoices/{stored[1].id}/file").content == pdf_bytes("b")
