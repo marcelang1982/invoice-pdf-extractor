@@ -2,20 +2,24 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, UploadFile
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..config import WebSettings
-from ..models import Invoice, InvoiceStatus
+from ..models import Invoice, InvoiceStatus, ReviewStatus
 from ..processing import process_invoice
 from ..storage import looks_like_pdf, sha256_of, store_pdf
 from . import get_session, get_settings
+from .pages import _filtered
 
 logger = logging.getLogger(__name__)
 
@@ -136,4 +140,103 @@ def _queue(
         invoice_id,
         settings,
         request.app.state.extractor_factory(),
+    )
+
+
+#: Columns of the CSV export, in order. One row per invoice.
+EXPORT_COLUMNS: tuple[str, ...] = (
+    "id",
+    "filename",
+    "status",
+    "review_status",
+    "review_note",
+    "vendor_name",
+    "invoice_number",
+    "issue_date",
+    "currency",
+    "total",
+    "issue_codes",
+    "model",
+    "tokens_in",
+    "tokens_out",
+    "uploaded_at",
+    "reviewed_at",
+)
+
+
+@router.post("/invoices/{invoice_id}/review")
+def review(
+    invoice_id: int,
+    decision: str = Form(...),
+    note: str = Form(""),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Record a human decision.
+
+    Only `review_status` moves. The machine's verdict stays as it was: a person
+    approving an invoice does not make its arithmetic add up, and a reviewer
+    needs to keep seeing why it was flagged.
+    """
+    if decision not in (ReviewStatus.APPROVED, ReviewStatus.REJECTED):
+        raise HTTPException(status_code=400, detail="Unknown review decision.")
+
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="No such invoice.")
+
+    invoice.review_status = decision
+    invoice.review_note = note.strip() or None
+    invoice.reviewed_at = datetime.now(timezone.utc)
+    session.commit()
+
+    return RedirectResponse(f"/invoices/{invoice_id}", status_code=303)
+
+
+@router.get("/invoices/export.csv")
+def export_csv(
+    status: str | None = None,
+    review: str | None = None,
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """Export the current filter as CSV, one row per invoice.
+
+    The same filters the list page applies, so what is exported is what is on
+    screen rather than whatever happens to be in the table.
+    """
+    invoices = session.scalars(
+        _filtered(select(Invoice), status, review)
+        .options(selectinload(Invoice.issues))
+        .order_by(Invoice.uploaded_at.desc(), Invoice.id.desc())
+    ).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(EXPORT_COLUMNS)
+    for invoice in invoices:
+        writer.writerow(
+            [
+                invoice.id,
+                invoice.filename,
+                invoice.status,
+                invoice.review_status,
+                invoice.review_note or "",
+                invoice.vendor_name or "",
+                invoice.invoice_number or "",
+                invoice.issue_date.isoformat() if invoice.issue_date else "",
+                invoice.currency or "",
+                f"{invoice.total:.2f}" if invoice.total is not None else "",
+                " ".join(invoice.issue_codes),
+                invoice.model or "",
+                invoice.tokens_in,
+                invoice.tokens_out,
+                invoice.uploaded_at.isoformat() if invoice.uploaded_at else "",
+                invoice.reviewed_at.isoformat() if invoice.reviewed_at else "",
+            ]
+        )
+
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="invoices.csv"'},
     )

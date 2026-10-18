@@ -54,8 +54,10 @@ def create_app(
     app.state.templates = templates
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-    app.include_router(pages.router)
+    # actions first: /invoices/export.csv has to be matched before the
+    # /invoices/{invoice_id} pattern, which would reject it as a bad int.
     app.include_router(actions.router)
+    app.include_router(pages.router)
     app.include_router(fragments.router)
     return app
 

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Invoice, InvoiceStatus, ReviewStatus
 from . import get_session, get_templates
+from .detail import extracted_invoice, place_issues
 
 router = APIRouter()
 
@@ -94,3 +96,48 @@ def _filtered(statement, status: str | None, review: str | None):
     if review in REVIEW_FILTERS:
         statement = statement.where(Invoice.review_status == review)
     return statement
+
+
+@router.get("/invoices/{invoice_id}", response_class=HTMLResponse)
+def detail_page(
+    invoice_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    templates=Depends(get_templates),
+):
+    """One invoice: the PDF beside the data pulled out of it."""
+    invoice = session.scalar(
+        select(Invoice)
+        .where(Invoice.id == invoice_id)
+        .options(selectinload(Invoice.issues))
+    )
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="No such invoice.")
+
+    return templates.TemplateResponse(
+        request,
+        "detail.html",
+        {
+            "invoice": invoice,
+            "extracted": extracted_invoice(invoice),
+            "issues": place_issues(invoice),
+        },
+    )
+
+
+@router.get("/invoices/{invoice_id}/file")
+def invoice_file(invoice_id: int, session: Session = Depends(get_session)):
+    """Serve the stored PDF, inline so the viewer can embed it."""
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="No such invoice.")
+
+    path = Path(invoice.stored_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="The stored PDF is missing.")
+
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{invoice.filename}"'},
+    )
