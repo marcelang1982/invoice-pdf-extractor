@@ -1044,7 +1044,10 @@ def render_factura_a(c: canvas.Canvas, sample: HardSample) -> None:
     c.drawString(left + 4 * mm, y - 5 * mm, f"Señor/es: {sample.customer.name}")
     c.drawString(left + 4 * mm, y - 10 * mm, f"Domicilio: {sample.customer.street}, {sample.customer.city}")
     c.drawString(left + 4 * mm, y - 15 * mm, "Condición frente al IVA: Responsable Inscripto")
-    c.drawString(mid + 30 * mm, y - 5 * mm, "CUIT: 33-55512349-9")
+    # Check digit deliberately wrong (module 11 expects 9), so this CUIT
+    # cannot belong to a real company. tests/test_sample_cuits.py enforces
+    # that for every CUIT in this file.
+    c.drawString(mid + 30 * mm, y - 5 * mm, "CUIT: 33-55512349-0")
     c.drawString(mid + 30 * mm, y - 10 * mm, "Condición de venta: Cuenta Corriente 30 días")
     c.drawString(mid + 30 * mm, y - 15 * mm, f"Moneda: {inv.currency}")
 

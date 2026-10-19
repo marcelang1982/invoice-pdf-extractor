@@ -100,6 +100,7 @@ If neither closes, the invoice is flagged, and the message explains what both pa
 
 - **The sample corpus is synthetic.** Every invoice here was generated for testing — no real company, person or tax ID appears anywhere. The "scanned" invoices are controlled degradations of clean renders: blur, rotation, grain and JPEG artefacts applied deliberately. That is harder than a clean PDF and genuinely exercises visual reading, but it is **not** the same as a photo of creased paper under uneven light, or a document that has been through a fax and two photocopiers. **These numbers should be re-measured on your real invoices before being relied on.**
 - **One tax rate per invoice.** An invoice charging 21% on some lines and 10.5% on others cannot currently be represented. This is common on Argentine Factura A and on EU invoices mixing standard and reduced rates.
+- **Argentine CUITs in the samples deliberately fail the check digit**, so they cannot belong to a real company. A test enforces this for every CUIT in the generators.
 - **No handwriting.** Handwritten amounts, annotations and signatures are out of scope.
 - **One currency per invoice**, taken as printed. No exchange-rate conversion.
 - **No withholdings or retentions** (IIBB, Ganancias), and no line-level tax.
