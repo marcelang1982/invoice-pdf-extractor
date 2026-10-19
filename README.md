@@ -118,7 +118,7 @@ cp .env.example .env        # then edit .env and fill in ANTHROPIC_API_KEY
 docker compose up --build
 ```
 
-Then open **http://127.0.0.1:8000**. Click **Load sample invoices** to run the
+Then open `http://127.0.0.1:8000`. Click **Load sample invoices** to run the
 31 bundled samples through it, or drop your own PDFs on the upload screen.
 
 ### Settings
