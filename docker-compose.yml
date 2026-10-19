@@ -14,6 +14,17 @@ services:
       timeout: 3s
       retries: 20
 
+  # ===========================================================================
+  # WARNING: this application has NO AUTHENTICATION.
+  #
+  # Anyone who can reach the port can read every invoice, approve or reject
+  # them, and download the whole table as CSV. It is published on 127.0.0.1
+  # so that only this machine can reach it.
+  #
+  # Do not change the bind address to 0.0.0.0, do not forward the port, and do
+  # not put it behind a tunnel or a public reverse proxy without adding
+  # authentication first.
+  # ===========================================================================
   app:
     build: .
     depends_on:
